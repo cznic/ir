@@ -5,6 +5,8 @@
 package ir
 
 import (
+	"bytes"
+	"encoding/gob"
 	"fmt"
 	"math"
 	"os"
@@ -13,8 +15,6 @@ import (
 	"strconv"
 	"strings"
 	"testing"
-
-	"github.com/cznic/xc"
 )
 
 func caller(s string, va ...interface{}) {
@@ -58,11 +58,11 @@ func init() {
 var (
 	types     = TypeCache{}
 	testModel = MemoryModel{
-		Int8:     ModelItem{Align: 1, Size: 1, StructAlign: 1},
-		Int16:    ModelItem{Align: 2, Size: 2, StructAlign: 2},
-		Int32:    ModelItem{Align: 4, Size: 4, StructAlign: 4},
-		Int64:    ModelItem{Align: 8, Size: 8, StructAlign: 8},
-		Function: ModelItem{Align: 8, Size: 8, StructAlign: 8},
+		Int8:     MemoryModelItem{Align: 1, Size: 1, StructAlign: 1},
+		Int16:    MemoryModelItem{Align: 2, Size: 2, StructAlign: 2},
+		Int32:    MemoryModelItem{Align: 4, Size: 4, StructAlign: 4},
+		Int64:    MemoryModelItem{Align: 8, Size: 8, StructAlign: 8},
+		Function: MemoryModelItem{Align: 8, Size: 8, StructAlign: 8},
 	}
 )
 
@@ -226,7 +226,7 @@ func TestParser(t *testing.T) {
 			"{",
 			"}",
 		} {
-			id := xc.Dict.SID(v + suffix)
+			id := dict.SID(v + suffix)
 			typ, err := types.Type(TypeID(id))
 			if err != nil {
 				if suffix == "" {
@@ -245,22 +245,22 @@ func TestParser(t *testing.T) {
 			}
 
 			s := "9" + v
-			if typ, err = types.Type(TypeID(xc.Dict.SID(s))); err == nil {
+			if typ, err = types.Type(TypeID(dict.SID(s))); err == nil {
 				t.Fatalf("%q", s)
 			}
 		}
 	}
 	for id, v := range types {
-		t.Logf("%d: %q", id, xc.Dict.S(int(id)))
+		t.Logf("%d: %q", id, dict.S(int(id)))
 		if g, e := v.ID(), id; g != e {
-			t.Fatalf("%q %d %d", xc.Dict.S(int(id)), g, e)
+			t.Fatalf("%q %d %d", dict.S(int(id)), g, e)
 		}
 	}
 }
 
 func TestParser2(t *testing.T) {
 	types = TypeCache{}
-	if _, err := types.Type(TypeID(xc.Dict.SID("struct{int8,struct{int16,int32},int64}"))); err != nil {
+	if _, err := types.Type(TypeID(dict.SID("struct{int8,struct{int16,int32},int64}"))); err != nil {
 		t.Fatal(err)
 	}
 
@@ -297,7 +297,7 @@ func TestAlignSize(t *testing.T) {
 		{"union{int64}", 8, 8},
 		{"union{}", 0, 0},
 	} {
-		typ, err := types.Type(TypeID(xc.Dict.SID(v.src)))
+		typ, err := types.Type(TypeID(dict.SID(v.src)))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -334,7 +334,7 @@ func TestLayoutOffset(t *testing.T) {
 		{"union{int8}", []int64{0}},
 		{"union{}", nil},
 	} {
-		typ, err := types.Type(TypeID(xc.Dict.SID(v.src)))
+		typ, err := types.Type(TypeID(dict.SID(v.src)))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -374,7 +374,7 @@ func TestLayoutSize(t *testing.T) {
 		{"union{int8}", []int64{1}},
 		{"union{}", nil},
 	} {
-		typ, err := types.Type(TypeID(xc.Dict.SID(v.src)))
+		typ, err := types.Type(TypeID(dict.SID(v.src)))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -414,7 +414,7 @@ func TestLayoutPadding(t *testing.T) {
 		{"union{int8}", []int{0}},
 		{"union{}", nil},
 	} {
-		typ, err := types.Type(TypeID(xc.Dict.SID(v.src)))
+		typ, err := types.Type(TypeID(dict.SID(v.src)))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -483,41 +483,41 @@ func benchmarkParser(b *testing.B) {
 
 func benchmarkTypeCache(b *testing.B) {
 	a := []TypeID{
-		TypeID(xc.Dict.SID("*int8")),
-		TypeID(xc.Dict.SID("[0]int8")),
-		TypeID(xc.Dict.SID("complex128")),
-		TypeID(xc.Dict.SID("complex256")),
-		TypeID(xc.Dict.SID("complex64")),
-		TypeID(xc.Dict.SID("float128")),
-		TypeID(xc.Dict.SID("float32")),
-		TypeID(xc.Dict.SID("float64")),
-		TypeID(xc.Dict.SID("func()")),
-		TypeID(xc.Dict.SID("func()(int32,int64)")),
-		TypeID(xc.Dict.SID("func()int32")),
-		TypeID(xc.Dict.SID("func(int8)")),
-		TypeID(xc.Dict.SID("func(int8)(int32,int64)")),
-		TypeID(xc.Dict.SID("func(int8)int32")),
-		TypeID(xc.Dict.SID("func(int8,int16)")),
-		TypeID(xc.Dict.SID("func(int8,int16)(int32,int64)")),
-		TypeID(xc.Dict.SID("func(int8,int16)int32")),
-		TypeID(xc.Dict.SID("int16")),
-		TypeID(xc.Dict.SID("int32")),
-		TypeID(xc.Dict.SID("int64")),
-		TypeID(xc.Dict.SID("int8")),
-		TypeID(xc.Dict.SID("struct{int8,int16}")),
-		TypeID(xc.Dict.SID("struct{int8}")),
-		TypeID(xc.Dict.SID("struct{}")),
-		TypeID(xc.Dict.SID("uint16")),
-		TypeID(xc.Dict.SID("uint32")),
-		TypeID(xc.Dict.SID("uint64")),
-		TypeID(xc.Dict.SID("uint8")),
-		TypeID(xc.Dict.SID("union{int8,int16}")),
-		TypeID(xc.Dict.SID("union{int8}")),
-		TypeID(xc.Dict.SID("union{}")),
+		TypeID(dict.SID("*int8")),
+		TypeID(dict.SID("[0]int8")),
+		TypeID(dict.SID("complex128")),
+		TypeID(dict.SID("complex256")),
+		TypeID(dict.SID("complex64")),
+		TypeID(dict.SID("float128")),
+		TypeID(dict.SID("float32")),
+		TypeID(dict.SID("float64")),
+		TypeID(dict.SID("func()")),
+		TypeID(dict.SID("func()(int32,int64)")),
+		TypeID(dict.SID("func()int32")),
+		TypeID(dict.SID("func(int8)")),
+		TypeID(dict.SID("func(int8)(int32,int64)")),
+		TypeID(dict.SID("func(int8)int32")),
+		TypeID(dict.SID("func(int8,int16)")),
+		TypeID(dict.SID("func(int8,int16)(int32,int64)")),
+		TypeID(dict.SID("func(int8,int16)int32")),
+		TypeID(dict.SID("int16")),
+		TypeID(dict.SID("int32")),
+		TypeID(dict.SID("int64")),
+		TypeID(dict.SID("int8")),
+		TypeID(dict.SID("struct{int8,int16}")),
+		TypeID(dict.SID("struct{int8}")),
+		TypeID(dict.SID("struct{}")),
+		TypeID(dict.SID("uint16")),
+		TypeID(dict.SID("uint32")),
+		TypeID(dict.SID("uint64")),
+		TypeID(dict.SID("uint8")),
+		TypeID(dict.SID("union{int8,int16}")),
+		TypeID(dict.SID("union{int8}")),
+		TypeID(dict.SID("union{}")),
 	}
 	n := 0
 	for _, v := range a {
-		n += len(xc.Dict.S(int(v)))
+		n += len(dict.S(int(v)))
 	}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -534,4 +534,80 @@ func Benchmark(b *testing.B) {
 	b.Run("Lexer", benchmarkLexer)
 	b.Run("Parser", benchmarkParser)
 	b.Run("TypeCache", benchmarkTypeCache)
+}
+
+func TestGobTypeID(t *testing.T) {
+	const c = "The quick brown fox type"
+	buf := bytes.NewBuffer(nil)
+	enc := gob.NewEncoder(buf)
+	in := TypeID(dict.SID(c))
+	if err := enc.Encode(in); err != nil {
+		t.Fatal(err)
+	}
+
+	if !bytes.Contains(buf.Bytes(), []byte(c)) {
+		t.Fatal("TypeID gob encoding fail")
+	}
+
+	out := TypeID(-1)
+	dec := gob.NewDecoder(buf)
+	if err := dec.Decode(&out); err != nil {
+		t.Fatal(err)
+	}
+
+	if g, e := in, out; g != e {
+		t.Fatal(g, e)
+	}
+}
+
+func TestGobNameID(t *testing.T) {
+	const c = "The quick brown fox name"
+	buf := bytes.NewBuffer(nil)
+	enc := gob.NewEncoder(buf)
+	in := NameID(dict.SID(c))
+	if err := enc.Encode(in); err != nil {
+		t.Fatal(err)
+	}
+
+	if !bytes.Contains(buf.Bytes(), []byte(c)) {
+		t.Fatal("NameID gob encoding fail")
+	}
+
+	out := NameID(-1)
+	dec := gob.NewDecoder(buf)
+	if err := dec.Decode(&out); err != nil {
+		t.Fatal(err)
+	}
+
+	if g, e := in, out; g != e {
+		t.Fatal(g, e)
+	}
+}
+
+func TestGobStringID(t *testing.T) {
+	const c = "The quick brown fox string"
+	buf := bytes.NewBuffer(nil)
+	enc := gob.NewEncoder(buf)
+	in := StringID(dict.SID(c))
+	if err := enc.Encode(in); err != nil {
+		t.Fatal(err)
+	}
+
+	if !bytes.Contains(buf.Bytes(), []byte(c)) {
+		t.Fatal("NameID gob encoding fail")
+	}
+
+	out := StringID(-1)
+	dec := gob.NewDecoder(buf)
+	if err := dec.Decode(&out); err != nil {
+		t.Fatal(err)
+	}
+
+	if g, e := in, out; g != e {
+		t.Fatal(g, e)
+	}
+}
+
+func TestGob(t *testing.T) {
+	t.Log("TODO")
 }

@@ -4,9 +4,9 @@ package ir
 
 import "fmt"
 
-const _TypeKind_name = "Int8Int16Int32Int64Uint0Uint8Uint16Uint32Uint64Float32Float64Float128Complex64Complex128Complex256ArrayUnionStructPointerFunction"
+const _TypeKind_name = "Int8Int16Int32Int64Uint8Uint16Uint32Uint64Float32Float64Float128Complex64Complex128Complex256ArrayUnionStructPointerFunction"
 
-var _TypeKind_index = [...]uint8{0, 4, 9, 14, 19, 24, 29, 35, 41, 47, 54, 61, 69, 78, 88, 98, 103, 108, 114, 121, 129}
+var _TypeKind_index = [...]uint8{0, 4, 9, 14, 19, 24, 30, 36, 42, 49, 56, 64, 73, 83, 93, 98, 103, 109, 116, 124}
 
 func (i TypeKind) String() string {
 	i -= 1

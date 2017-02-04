@@ -4,7 +4,17 @@
 
 package ir
 
-// TypeKind encodes a particular type kind.
+// Linkage represents a linkage type.
+type Linkage int
+
+// Linkage values.
+const (
+	_ Linkage = iota
+	ExternalLinkage
+	InternalLinkage
+)
+
+// TypeKind represents a particular type kind.
 type TypeKind int
 
 // TypeKind values.
@@ -15,7 +25,6 @@ const (
 	Int32
 	Int64
 
-	Uint0
 	Uint8
 	Uint16
 	Uint32

@@ -32,7 +32,7 @@ cpu: clean
 edit:
 	@ 1>/dev/null 2>/dev/null gvim -p Makefile *.go
 
-editor: tok_string.go typekind_string.go
+editor: linkage_string.go tok_string.go typekind_string.go
 	gofmt -l -s -w *.go
 	go test -i
 	go test 2>&1 | tee log
@@ -44,6 +44,9 @@ internalError:
 later:
 	@grep -n $(grep) LATER * || true
 	@grep -n $(grep) MAYBE * || true
+
+linkage_string.go: enum.go
+	stringer -type Linkage enum.go
 
 mem: clean
 	go test -run @ -bench . -memprofile mem.out -memprofilerate 1 -timeout 24h

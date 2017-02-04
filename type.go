@@ -7,8 +7,6 @@ package ir
 import (
 	"fmt"
 	"math"
-
-	"github.com/cznic/xc"
 )
 
 var (
@@ -18,167 +16,6 @@ var (
 	_ Type = (*StructOrUnionType)(nil)
 	_ Type = (*TypeBase)(nil)
 )
-
-func roundup(n, to int64) int64 {
-	if r := n % to; r != 0 {
-		return n + to - r
-	}
-
-	return n
-}
-
-// ModelItem describes memory properties of a particular type kind.
-type ModelItem struct {
-	Size        uint
-	Align       uint
-	StructAlign uint
-}
-
-// MemoryModel defines properties of types. A valid memory model must provide
-// model items for all type kinds. Methods of invalid models may panic.
-type MemoryModel map[TypeKind]ModelItem
-
-// Alignof computes the memory alignment requirements of t. Zero is returned
-// for a struct/union type with no fields.
-func (m MemoryModel) Alignof(t Type) int {
-	switch x := t.(type) {
-	case *ArrayType:
-		return m.Alignof(x.Item)
-	case *StructOrUnionType:
-		var r int
-		for _, v := range x.Fields {
-			if a := m.Alignof(v); a > r {
-				r = a
-			}
-		}
-		return r
-	default:
-		item, ok := m[t.Kind()]
-		if !ok {
-			panic(fmt.Errorf("missing model item for %s", t.Kind()))
-		}
-
-		return int(item.Align)
-	}
-}
-
-// Layout computes the memory layout of t.
-func (m MemoryModel) Layout(t *StructOrUnionType) []Field {
-	if len(t.Fields) == 0 {
-		return nil
-	}
-
-	r := make([]Field, len(t.Fields))
-	switch t.Kind() {
-	case Struct:
-		var off int64
-		for i, v := range t.Fields {
-			sz := m.Sizeof(v)
-			a := m.StructAlignof(v)
-			z := off
-			off = roundup(off, int64(a))
-			if off != z {
-				r[i-1].Padding = int(off - z)
-			}
-			r[i] = Field{Offset: off, Size: sz}
-			off += sz
-		}
-		z := off
-		off = roundup(off, int64(m.Alignof(t)))
-		if off != z {
-			r[len(r)-1].Padding = int(off - z)
-		}
-	case Union:
-		var sz int64
-		for i, v := range t.Fields {
-			n := m.Sizeof(v)
-			r[i] = Field{Size: n}
-			if n > sz {
-				sz = n
-			}
-		}
-		sz = roundup(sz, int64(m.Alignof(t)))
-		for i, v := range r {
-			r[i].Padding = int(sz - v.Size)
-		}
-	}
-	return r
-}
-
-// Sizeof computes the memory size of t.
-func (m MemoryModel) Sizeof(t Type) int64 {
-	switch x := t.(type) {
-	case *ArrayType:
-		return m.Sizeof(x.Item) * x.Items
-	case *StructOrUnionType:
-		if len(x.Fields) == 0 {
-			return 0
-		}
-
-		switch t.Kind() {
-		case Struct:
-			var off int64
-			for _, v := range x.Fields {
-				sz := m.Sizeof(v)
-				a := m.StructAlignof(v)
-				off = roundup(off, int64(a))
-				off += sz
-			}
-			return roundup(off, int64(m.Alignof(t)))
-		case Union:
-			var sz int64
-			for _, v := range x.Fields {
-				if n := m.Sizeof(v); n > sz {
-					sz = n
-				}
-			}
-			return roundup(sz, int64(m.Alignof(t)))
-		}
-	default:
-		item, ok := m[t.Kind()]
-		if !ok {
-			panic(fmt.Errorf("missing model item for %s", t.Kind()))
-		}
-
-		return int64(item.Size)
-	}
-	panic("internal error")
-}
-
-// StructAlignof computes the memory alignment requirements of t when its
-// instance is a struct field. Zero is returned for a struct/union type with no
-// fields.
-func (m MemoryModel) StructAlignof(t Type) int {
-	switch x := t.(type) {
-	case *ArrayType:
-		return m.StructAlignof(x.Item)
-	case *StructOrUnionType:
-		var r int
-		for _, v := range x.Fields {
-			if a := m.StructAlignof(v); a > r {
-				r = a
-			}
-		}
-		return r
-	default:
-		item, ok := m[t.Kind()]
-		if !ok {
-			panic(fmt.Errorf("missing model item for %s", t.Kind()))
-		}
-
-		return int(item.StructAlign)
-	}
-}
-
-// Field is an item of the result produced by MemoryModel.Layout.
-type Field struct {
-	Offset  int64 // Relative to start of the struct/union.
-	Size    int64 // Field size for copying.
-	Padding int   // Adjustment to enforce proper alignment.
-}
-
-// Sizeof returns the sum of f.Size and f.Padding.
-func (f *Field) Sizeof() int64 { return f.Size + int64(f.Padding) }
 
 // Type represents an IR type.
 //
@@ -227,7 +64,7 @@ func (t *TypeBase) setID(id TypeID, p0 []byte, p *[]byte, c TypeCache, u Type) T
 	}
 
 	if id == 0 {
-		id = TypeID(xc.Dict.ID(p0[:len(p0)-len(*p)]))
+		id = TypeID(dict.ID(p0[:len(p0)-len(*p)]))
 	}
 	t.TypeID = id
 	c[id] = u
@@ -235,7 +72,7 @@ func (t *TypeBase) setID(id TypeID, p0 []byte, p *[]byte, c TypeCache, u Type) T
 }
 
 // TypeID is a numeric identifier of a type specifier as registered in a global
-// xc.Dict[0].
+// dict[0].
 //
 //  [0]: https://godoc.org/github.com/cznic/xc#pkg-variables
 type TypeID int
@@ -247,7 +84,18 @@ func (t TypeID) Equal(u Type) bool { return t == u.ID() }
 func (t TypeID) ID() TypeID { return t }
 
 // String implements fmt.Stringer.
-func (t TypeID) String() string { return string(xc.Dict.S(int(t))) }
+func (t TypeID) String() string { return string(dict.S(int(t))) }
+
+// GobDecode implements GobDecoder.
+func (t *TypeID) GobDecode(b []byte) error {
+	*t = TypeID(dict.ID(b))
+	return nil
+}
+
+// GobEncode implements GobEncoder.
+func (t TypeID) GobEncode() ([]byte, error) {
+	return append([]byte(nil), dict.S(int(t))...), nil
+}
 
 // ArrayType represents a collection of items that can be selected by index.
 type ArrayType struct {
@@ -648,14 +496,14 @@ func (c TypeCache) parse(p *[]byte, id TypeID) (Type, error) {
 }
 
 // Type returns the type identified by id or an error, if any. If the cache has
-// already an value for id, it is returned.  Otherwise the type specifier
+// already a value for id, it is returned.  Otherwise the type specifier
 // denoted by id is parsed.
 func (c TypeCache) Type(id TypeID) (Type, error) {
 	if t := c[id]; t != nil {
 		return t, nil
 	}
 
-	b := xc.Dict.S(int(id))
+	b := dict.S(int(id))
 	t, err := c.parse(&b, id)
 	if err != nil {
 		return nil, err
