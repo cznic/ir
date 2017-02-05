@@ -10,8 +10,21 @@ type Linkage int
 // Linkage values.
 const (
 	_ Linkage = iota
+
 	ExternalLinkage
 	InternalLinkage
+)
+
+type opcode int
+
+const (
+	_ opcode = iota
+
+	arguments
+	beginScope
+	endScope
+	result
+	variable
 )
 
 // TypeKind represents a particular type kind.
@@ -20,6 +33,7 @@ type TypeKind int
 // TypeKind values.
 const (
 	_ TypeKind = iota
+
 	Int8
 	Int16
 	Int32

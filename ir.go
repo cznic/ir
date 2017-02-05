@@ -18,7 +18,7 @@ var (
 )
 
 // NameID is a numeric identifier of an identifier as registered in a global
-// dict[0].
+// dictionary[0].
 //
 //  [0]: https://godoc.org/github.com/cznic/xc#pkg-variables
 type NameID int
@@ -38,7 +38,7 @@ func (t NameID) GobEncode() ([]byte, error) {
 }
 
 // StringID is a numeric identifier of a string literal as registered in a
-// global dict[0].
+// global dictionary[0].
 //
 //  [0]: https://godoc.org/github.com/cznic/xc#pkg-variables
 type StringID int
@@ -90,7 +90,7 @@ type Declaration struct {
 	Value
 }
 
-// NewDeclaration returns a newly create Declaration.
+// NewDeclaration returns a newly created Declaration.
 func NewDeclaration(p token.Position, name, typeName NameID, typ TypeID, l Linkage, initializer Value) *Declaration {
 	return &Declaration{
 		ObjectBase: newObjectBase(p, name, typeName, typ, l),
@@ -100,12 +100,17 @@ func NewDeclaration(p token.Position, name, typeName NameID, typ TypeID, l Linka
 
 // FunctionDefinition represents a function definition.
 type FunctionDefinition struct {
+	Arguments []NameID // May be nil.
+	Body      []Operation
 	ObjectBase
+	Results []NameID // May be nil.
 }
 
-// NewFunctionDefinition returns a newly create Declaration.
-func NewFunctionDefinition(p token.Position, name, typeName NameID, typ TypeID, l Linkage) *FunctionDefinition {
+// NewFunctionDefinition returns a newly created FunctionDefinition.
+func NewFunctionDefinition(p token.Position, name, typeName NameID, typ TypeID, l Linkage, argumnents, results []NameID) *FunctionDefinition {
 	return &FunctionDefinition{
+		Arguments:  argumnents,
 		ObjectBase: newObjectBase(p, name, typeName, typ, l),
+		Results:    results,
 	}
 }

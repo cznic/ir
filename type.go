@@ -72,7 +72,7 @@ func (t *TypeBase) setID(id TypeID, p0 []byte, p *[]byte, c TypeCache, u Type) T
 }
 
 // TypeID is a numeric identifier of a type specifier as registered in a global
-// dict[0].
+// dictionary[0].
 //
 //  [0]: https://godoc.org/github.com/cznic/xc#pkg-variables
 type TypeID int
