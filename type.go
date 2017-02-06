@@ -7,6 +7,8 @@ package ir
 import (
 	"fmt"
 	"math"
+
+	"github.com/cznic/internal/buffer"
 )
 
 var (
@@ -46,6 +48,7 @@ type Type interface {
 	Kind() TypeKind
 	ID() TypeID
 	Equal(Type) bool
+	Pointer() Type
 }
 
 // TypeBase collects fields common to all types.
@@ -69,6 +72,19 @@ func (t *TypeBase) setID(id TypeID, p0 []byte, p *[]byte, c TypeCache, u Type) T
 	t.TypeID = id
 	c[id] = u
 	return u
+}
+
+// Pointer implements Type.
+func (t *TypeBase) Pointer() Type { return newPointerType(t) }
+
+func newPointerType(t Type) Type {
+	var buf buffer.Bytes
+	buf.WriteByte('*')
+	buf.Write(dict.S(int(t.ID())))
+	return &PointerType{
+		TypeBase: TypeBase{TypeKind: Pointer, TypeID: TypeID(dict.ID(buf.Bytes()))},
+		Element:  t,
+	}
 }
 
 // TypeID is a numeric identifier of a type specifier as registered in a global
@@ -104,6 +120,9 @@ type ArrayType struct {
 	Items int64
 }
 
+// Pointer implements Type.
+func (t *ArrayType) Pointer() Type { return newPointerType(t) }
+
 // FunctionType represents a function, its possibly variadic, optional
 // arguments and results.
 type FunctionType struct {
@@ -113,11 +132,17 @@ type FunctionType struct {
 	Variadic  bool // C-variadic.
 }
 
+// Pointer implements Type.
+func (t *FunctionType) Pointer() Type { return newPointerType(t) }
+
 // PointerType represents a pointer to an element, an instance of another type.
 type PointerType struct {
 	TypeBase
 	Element Type
 }
+
+// Pointer implements Type.
+func (t *PointerType) Pointer() Type { return newPointerType(t) }
 
 // StructOrUnionType represents a collection of fields that can be selected by
 // name.
@@ -125,6 +150,9 @@ type StructOrUnionType struct {
 	TypeBase
 	Fields []Type
 }
+
+// Pointer implements Type.
+func (t *StructOrUnionType) Pointer() Type { return newPointerType(t) }
 
 // TypeCache maps TypeIDs to  Types. Use TypeCache{} to create a ready to use
 // TypeCache value.

@@ -12,6 +12,7 @@ import (
 	"os"
 	"path"
 	"runtime"
+	"sort"
 	"strconv"
 	"strings"
 	"testing"
@@ -266,6 +267,22 @@ func TestParser2(t *testing.T) {
 
 	if g, e := len(types), 6; g != e {
 		t.Fatal(g, e)
+	}
+
+	var a []string
+	for k := range types {
+		a = append(a, string(dict.S(int(k))))
+	}
+	sort.Strings(a)
+	if g, e := strings.Join(a, "\n"), strings.TrimSpace(`
+int16
+int32
+int64
+int8
+struct{int16,int32}
+struct{int8,struct{int16,int32},int64}
+`); g != e {
+		t.Fatalf("==== got\n%s\n==== exp\n%s", g, e)
 	}
 }
 

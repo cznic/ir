@@ -15,18 +15,6 @@ const (
 	InternalLinkage
 )
 
-type opcode int
-
-const (
-	_ opcode = iota
-
-	arguments
-	beginScope
-	endScope
-	result
-	variable
-)
-
 // TypeKind represents a particular type kind.
 type TypeKind int
 

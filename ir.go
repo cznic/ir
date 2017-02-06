@@ -59,7 +59,7 @@ func (t StringID) GobEncode() ([]byte, error) {
 
 // Object represents a declarations or definitions of static data and functions.
 type Object interface {
-	object()
+	Verify() error
 }
 
 // ObjectBase collects fields common to all objects.
@@ -81,8 +81,6 @@ func newObjectBase(p token.Position, nm, tnm NameID, typ TypeID, l Linkage) Obje
 	}
 }
 
-func (ObjectBase) object() {}
-
 // Declaration represents a variable declaration/definition or a function
 // declaration.
 type Declaration struct {
@@ -97,6 +95,9 @@ func NewDeclaration(p token.Position, name, typeName NameID, typ TypeID, l Linka
 		Value:      initializer,
 	}
 }
+
+// Verify implements Object.
+func (d *Declaration) Verify() error { return nil }
 
 // FunctionDefinition represents a function definition.
 type FunctionDefinition struct {
@@ -113,4 +114,15 @@ func NewFunctionDefinition(p token.Position, name, typeName NameID, typ TypeID, 
 		ObjectBase: newObjectBase(p, name, typeName, typ, l),
 		Results:    results,
 	}
+}
+
+// Verify implements Object.
+func (f *FunctionDefinition) Verify() (err error) {
+	var s []TypeID
+	for _, v := range f.Body {
+		if s, err = v.verify(append([]TypeID(nil), s...)); err != nil {
+			return err
+		}
+	}
+	return nil
 }

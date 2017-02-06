@@ -5,7 +5,8 @@
 package ir
 
 var (
-	_ Value = (*StringLitValue)(nil)
+	_ Value = (*Int32Value)(nil)
+	_ Value = (*StringValue)(nil)
 )
 
 type valuer struct{}
@@ -18,7 +19,14 @@ type Value interface {
 	value()
 }
 
-type StringLitValue struct {
+// Int32Value is a declaration initializer constant of type int32.
+type Int32Value struct {
+	valuer
+	Value int32
+}
+
+// StringValue is a declaration initializer constant of type string.
+type StringValue struct {
 	valuer
 	StringID
 }

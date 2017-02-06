@@ -24,6 +24,9 @@ func init() {
 var (
 	dict = xc.Dict
 
+	idInt32   = dict.SID("int32")
+	idInt8Ptr = dict.SID("*int8")
+
 	printHooks = strutil.PrettyPrintHooks{
 		reflect.TypeOf(NameID(0)): func(f strutil.Formatter, v interface{}, prefix, suffix string) {
 			f.Format(prefix)
