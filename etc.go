@@ -6,6 +6,7 @@ package ir
 
 import (
 	"encoding/gob"
+	"fmt"
 	"go/token"
 	"reflect"
 
@@ -29,26 +30,71 @@ var (
 
 	printHooks = strutil.PrettyPrintHooks{
 		reflect.TypeOf(NameID(0)): func(f strutil.Formatter, v interface{}, prefix, suffix string) {
+			x := v.(NameID)
+			if x == 0 {
+				return
+			}
+
 			f.Format(prefix)
-			f.Format("%s", dict.S(int(v.(NameID))))
+			f.Format("%s", dict.S(int(x)))
 			f.Format(suffix)
 		},
 		reflect.TypeOf(StringID(0)): func(f strutil.Formatter, v interface{}, prefix, suffix string) {
+			x := v.(StringID)
+			if x == 0 {
+				return
+			}
+
 			f.Format(prefix)
-			f.Format("%q", dict.S(int(v.(StringID))))
+			f.Format("%q", dict.S(int(x)))
 			f.Format(suffix)
 		},
 		reflect.TypeOf(TypeID(0)): func(f strutil.Formatter, v interface{}, prefix, suffix string) {
+			x := v.(TypeID)
+			if x == 0 {
+				return
+			}
+
 			f.Format(prefix)
-			f.Format("%s", dict.S(int(v.(TypeID))))
+			f.Format("%s", dict.S(int(x)))
 			f.Format(suffix)
 		},
 		reflect.TypeOf(token.Position{}): func(f strutil.Formatter, v interface{}, prefix, suffix string) {
+			x := v.(token.Position)
+			if !x.IsValid() {
+				return
+			}
+
 			f.Format(prefix)
-			f.Format("%s", v.(token.Position))
+			f.Format("%s", x)
+			f.Format(suffix)
+		},
+		reflect.TypeOf(Linkage(0)): func(f strutil.Formatter, v interface{}, prefix, suffix string) {
+			x := v.(Linkage)
+			if x == 0 {
+				return
+			}
+
+			f.Format(prefix)
+			f.Format("%s", x)
 			f.Format(suffix)
 		},
 	}
 )
 
-func pretty(v interface{}) string { return strutil.PrettyString(v, "", "", printHooks) }
+func PrettyString(v interface{}) string {
+	switch x := v.(type) {
+	case *BeginScope:
+		return fmt.Sprintf("beginScope\t; %s", x.Position)
+	default:
+		return strutil.PrettyString(v, "", "", printHooks)
+	}
+}
+
+func addr(n bool) string {
+	if n {
+		return "&"
+	}
+
+	return ""
+}

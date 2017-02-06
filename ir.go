@@ -9,6 +9,7 @@
 package ir
 
 import (
+	"fmt"
 	"go/token"
 )
 
@@ -119,9 +120,9 @@ func NewFunctionDefinition(p token.Position, name, typeName NameID, typ TypeID, 
 // Verify implements Object.
 func (f *FunctionDefinition) Verify() (err error) {
 	var s []TypeID
-	for _, v := range f.Body {
-		if s, err = v.verify(append([]TypeID(nil), s...)); err != nil {
-			return err
+	for i, v := range f.Body {
+		if s, err = v.verify(s[:len(s):len(s)]); err != nil {
+			return fmt.Errorf("%s:%#x: %s", f.NameID, i, err)
 		}
 	}
 	return nil

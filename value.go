@@ -4,6 +4,10 @@
 
 package ir
 
+import (
+	"fmt"
+)
+
 var (
 	_ Value = (*Int32Value)(nil)
 	_ Value = (*StringValue)(nil)
@@ -25,8 +29,12 @@ type Int32Value struct {
 	Value int32
 }
 
+func (v *Int32Value) String() string { return fmt.Sprint(v.Value) }
+
 // StringValue is a declaration initializer constant of type string.
 type StringValue struct {
 	valuer
 	StringID
 }
+
+func (v *StringValue) String() string { return fmt.Sprint(v.StringID) }
