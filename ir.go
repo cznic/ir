@@ -119,11 +119,30 @@ func NewFunctionDefinition(p token.Position, name, typeName NameID, typ TypeID, 
 
 // Verify implements Object.
 func (f *FunctionDefinition) Verify() (err error) {
+	vv := &verifier{
+		f,
+		TypeCache{},
+	}
 	var s []TypeID
+	scope := 0
 	for i, v := range f.Body {
-		if s, err = v.verify(s[:len(s):len(s)]); err != nil {
+		switch v.(type) {
+		case *BeginScope:
+			scope++
+		case *EndScope:
+			scope--
+		}
+		if s, err = v.verify(vv, s[:len(s):len(s)]); err != nil {
 			return fmt.Errorf("%s:%#x: %s", f.NameID, i, err)
 		}
 	}
+	if scope != 0 {
+		return fmt.Errorf("unbalanced BeginScope/EndScope")
+	}
 	return nil
+}
+
+type verifier struct {
+	f *FunctionDefinition
+	c TypeCache
 }

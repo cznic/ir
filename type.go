@@ -544,3 +544,13 @@ func (c TypeCache) Type(id TypeID) (Type, error) {
 	c[id] = t
 	return t, nil
 }
+
+// MustType is like Type but panics on error.
+func (c TypeCache) MustType(id TypeID) Type {
+	t, err := c.Type(id)
+	if err != nil {
+		panic(err)
+	}
+
+	return t
+}

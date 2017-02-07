@@ -31,7 +31,7 @@ var (
 
 // Operation is a unit of execution.
 type Operation interface {
-	verify([]TypeID) ([]TypeID, error)
+	verify(*verifier, []TypeID) ([]TypeID, error)
 }
 
 // AllocResult operation reserves evaluation stack space for a result of type
@@ -42,14 +42,15 @@ type AllocResult struct {
 	token.Position
 }
 
-func (o *AllocResult) verify(in []TypeID) ([]TypeID, error) { return append(in, o.TypeID), nil }
+func (o *AllocResult) verify(v *verifier, in []TypeID) ([]TypeID, error) {
+	return append(in, o.TypeID), nil
+}
 
 func (o *AllocResult) String() string {
 	return fmt.Sprintf("\t%-*s\t%v\t; %s %s", opw, "allocResult", o.TypeID, o.TypeName, o.Position)
 }
 
-// Argument pushes a function argument by index, or its address, to the
-// evaluation stack.
+// Argument pushes argument Index, or its address, to the evaluation stack.
 type Argument struct {
 	Address bool
 	Index   int
@@ -57,19 +58,34 @@ type Argument struct {
 	token.Position
 }
 
-func (o *Argument) verify(in []TypeID) ([]TypeID, error) { return append(in, o.TypeID), nil }
+func (o *Argument) verify(v *verifier, in []TypeID) ([]TypeID, error) {
+	args := v.c.MustType(v.f.TypeID).(*FunctionType).Arguments
+	if o.Index < 0 || o.Index >= len(args) {
+		return nil, fmt.Errorf("invalid argument index")
+	}
+
+	t := args[o.Index]
+	if o.Address {
+		t = t.Pointer()
+	}
+	if g, e := o.TypeID, t.ID(); g != e {
+		return nil, fmt.Errorf("expected type %s", e)
+	}
+
+	return append(in, o.TypeID), nil
+}
 
 func (o *Argument) String() string {
 	return fmt.Sprintf("\t%-*s\t%s%v, %v\t; %s", opw, "argument", addr(o.Address), o.Index, o.TypeID, o.Position)
 }
 
-// Arguments operation annotates that function results, if any are allocated
+// Arguments operation annotates that function results, if any, are allocated
 // and function call arguments evaluation starts.
 type Arguments struct {
 	token.Position
 }
 
-func (o *Arguments) verify(in []TypeID) ([]TypeID, error) { return in, nil }
+func (o *Arguments) verify(v *verifier, in []TypeID) ([]TypeID, error) { return in, nil }
 
 func (o *Arguments) String() string {
 	return fmt.Sprintf("\t%-*s\t\t; %s", opw, "arguments", o.Position)
@@ -80,7 +96,7 @@ type BeginScope struct {
 	token.Position
 }
 
-func (o *BeginScope) verify(in []TypeID) ([]TypeID, error) {
+func (o *BeginScope) verify(v *verifier, in []TypeID) ([]TypeID, error) {
 	if len(in) != 0 {
 		return nil, fmt.Errorf("non empty evaluation stack at scope begin")
 	}
@@ -92,17 +108,38 @@ func (o *BeginScope) String() string {
 	return fmt.Sprintf("\t%-*s\t\t; %s", opw, "beginScope", o.Position)
 }
 
-// Call operation executes a call through the function pointer on top of the
-// evaluation stack.
+// Call operation performs a function call. The evaluation stack contains the
+// function pointer to be called followed by the actual number of arguments.
 type Call struct {
 	Arguments int // Actual number of arguments passed to function.
-	TypeID
+	TypeID        // Type of the function pointer.
 	token.Position
 }
 
-func (o *Call) verify(in []TypeID) ([]TypeID, error) {
+func (o *Call) verify(v *verifier, in []TypeID) ([]TypeID, error) {
 	if len(in) < o.Arguments+1 {
 		return nil, fmt.Errorf("evaluation stack underflow")
+	}
+
+	ft := in[len(in)-o.Arguments-1]
+	if g, e := o.TypeID, ft; g != e {
+		return nil, fmt.Errorf("invalid call site pointer, expected %s", e)
+	}
+
+	t := v.c.MustType(ft).(*PointerType).Element
+	if t.Kind() != Function {
+		return nil, fmt.Errorf("invalid call site %s", t.ID())
+	}
+
+	args := t.(*FunctionType).Arguments
+	for i, v := range in[len(in)-o.Arguments:] {
+		if i >= len(args) {
+			break
+		}
+
+		if g, e := args[i].ID(), v; g != e {
+			return nil, fmt.Errorf("invalid argument #%v type, expected %s", i, e)
+		}
 	}
 
 	return in[:len(in)-o.Arguments-1], nil
@@ -118,7 +155,7 @@ type Drop struct {
 	token.Position
 }
 
-func (o *Drop) verify(in []TypeID) ([]TypeID, error) {
+func (o *Drop) verify(v *verifier, in []TypeID) ([]TypeID, error) {
 	if len(in) == 0 {
 		return nil, fmt.Errorf("evaluation stack underflow")
 	}
@@ -135,7 +172,7 @@ type EndScope struct {
 	token.Position
 }
 
-func (o *EndScope) verify(in []TypeID) ([]TypeID, error) {
+func (o *EndScope) verify(v *verifier, in []TypeID) ([]TypeID, error) {
 	if len(in) != 0 {
 		return nil, fmt.Errorf("non empty evaluation stack at scope end")
 	}
@@ -156,7 +193,7 @@ type Extern struct {
 	token.Position
 }
 
-func (o *Extern) verify(in []TypeID) ([]TypeID, error) { return append(in, o.TypeID), nil }
+func (o *Extern) verify(v *verifier, in []TypeID) ([]TypeID, error) { return append(in, o.TypeID), nil }
 
 func (o *Extern) String() string {
 	return fmt.Sprintf("extern\t%-*s\t%s\t; %s %s", opw, addr(o.Address)+o.NameID.String(), o.TypeID, o.TypeName, o.Position)
@@ -168,7 +205,9 @@ type Int32Const struct {
 	token.Position
 }
 
-func (o *Int32Const) verify(in []TypeID) ([]TypeID, error) { return append(in, TypeID(idInt32)), nil }
+func (o *Int32Const) verify(v *verifier, in []TypeID) ([]TypeID, error) {
+	return append(in, TypeID(idInt32)), nil
+}
 
 func (o *Int32Const) String() string {
 	return fmt.Sprintf("\t%-*s\t%v, int32\t; %s", opw, "const", o.Value, o.Position)
@@ -180,7 +219,7 @@ type Return struct {
 	token.Position
 }
 
-func (o *Return) verify(in []TypeID) ([]TypeID, error) {
+func (o *Return) verify(v *verifier, in []TypeID) ([]TypeID, error) {
 	if len(in) != 0 {
 		return nil, fmt.Errorf("non empty evaluation stack on return: %v", in)
 	}
@@ -201,7 +240,7 @@ type Result struct {
 	token.Position
 }
 
-func (o *Result) verify(in []TypeID) ([]TypeID, error) { return append(in, o.TypeID), nil }
+func (o *Result) verify(v *verifier, in []TypeID) ([]TypeID, error) { return append(in, o.TypeID), nil }
 
 func (o *Result) String() string {
 	return fmt.Sprintf("\t%-*s\t%s%v, %v\t; %s", opw, "result", addr(o.Address), o.Index, o.TypeID, o.Position)
@@ -214,7 +253,7 @@ type Store struct {
 	token.Position
 }
 
-func (o *Store) verify(in []TypeID) ([]TypeID, error) {
+func (o *Store) verify(v *verifier, in []TypeID) ([]TypeID, error) {
 	if len(in) < 2 {
 		return nil, fmt.Errorf("evaluation stack underflow")
 	}
@@ -226,13 +265,15 @@ func (o *Store) String() string {
 	return fmt.Sprintf("\t%-*s\t%s\t; %s", opw, "store", o.TypeID, o.Position)
 }
 
-// Int32Const operation pushes a string literal on the evaluation stack.
+// StringConst operation pushes a string literal on the evaluation stack.
 type StringConst struct {
 	Value StringID
 	token.Position
 }
 
-func (o *StringConst) verify(in []TypeID) ([]TypeID, error) { return append(in, TypeID(idInt8Ptr)), nil }
+func (o *StringConst) verify(v *verifier, in []TypeID) ([]TypeID, error) {
+	return append(in, TypeID(idInt8Ptr)), nil
+}
 
 func (o *StringConst) String() string {
 	return fmt.Sprintf("\t%-*s\t%q, %s\t; %s", opw, "const", o.Value, dict.S(idInt8Ptr), o.Position)
@@ -247,7 +288,9 @@ type Variable struct {
 	token.Position
 }
 
-func (o *Variable) verify(in []TypeID) ([]TypeID, error) { return append(in, o.TypeID), nil }
+func (o *Variable) verify(v *verifier, in []TypeID) ([]TypeID, error) {
+	return append(in, o.TypeID), nil
+}
 
 func (o *Variable) String() string {
 	return fmt.Sprintf("\t%-*s\t%s%v, %v\t; %s", opw, "variable", addr(o.Address), o.Index, o.TypeID, o.Position)
@@ -264,7 +307,7 @@ type VariableDeclaration struct {
 	token.Position
 }
 
-func (o *VariableDeclaration) verify(in []TypeID) ([]TypeID, error) { return in, nil }
+func (o *VariableDeclaration) verify(v *verifier, in []TypeID) ([]TypeID, error) { return in, nil }
 
 func (o *VariableDeclaration) String() string {
 	var s string
