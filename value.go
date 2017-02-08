@@ -37,4 +37,4 @@ type StringValue struct {
 	StringID
 }
 
-func (v *StringValue) String() string { return fmt.Sprint(v.StringID) }
+func (v *StringValue) String() string { return fmt.Sprintf("%q", v.StringID) }

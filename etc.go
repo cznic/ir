@@ -15,7 +15,7 @@ import (
 )
 
 func init() {
-	gob.Register(&Declaration{})
+	gob.Register(&DataDefinition{})
 	gob.Register(&FunctionDefinition{})
 	gob.Register(NameID(0))
 	gob.Register(StringID(0))
@@ -27,6 +27,7 @@ var (
 
 	idInt32   = dict.SID("int32")
 	idInt8Ptr = dict.SID("*int8")
+	idStart   = dict.SID("_start")
 
 	printHooks = strutil.PrettyPrintHooks{
 		reflect.TypeOf(NameID(0)): func(f strutil.Formatter, v interface{}, prefix, suffix string) {

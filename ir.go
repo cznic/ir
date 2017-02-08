@@ -14,8 +14,11 @@ import (
 )
 
 var (
-	_ Object = (*Declaration)(nil)
+	_ Object = (*DataDefinition)(nil)
 	_ Object = (*FunctionDefinition)(nil)
+
+	// Testing amends things for tests.
+	Testing bool
 )
 
 // NameID is a numeric identifier of an identifier as registered in a global
@@ -82,23 +85,23 @@ func newObjectBase(p token.Position, nm, tnm NameID, typ TypeID, l Linkage) Obje
 	}
 }
 
-// Declaration represents a variable declaration/definition or a function
-// declaration.
-type Declaration struct {
+// DataDefinition represents a variable definition and an optional initializer
+// value.
+type DataDefinition struct {
 	ObjectBase
 	Value
 }
 
-// NewDeclaration returns a newly created Declaration.
-func NewDeclaration(p token.Position, name, typeName NameID, typ TypeID, l Linkage, initializer Value) *Declaration {
-	return &Declaration{
+// NewDataDefinition returns a newly created DataDefinition.
+func NewDataDefinition(p token.Position, name, typeName NameID, typ TypeID, l Linkage, initializer Value) *DataDefinition {
+	return &DataDefinition{
 		ObjectBase: newObjectBase(p, name, typeName, typ, l),
 		Value:      initializer,
 	}
 }
 
 // Verify implements Object.
-func (d *Declaration) Verify() error { return nil }
+func (d *DataDefinition) Verify() error { return nil }
 
 // FunctionDefinition represents a function definition.
 type FunctionDefinition struct {
@@ -120,29 +123,27 @@ func NewFunctionDefinition(p token.Position, name, typeName NameID, typ TypeID, 
 // Verify implements Object.
 func (f *FunctionDefinition) Verify() (err error) {
 	vv := &verifier{
-		f,
-		TypeCache{},
+		function:  f,
+		typeCache: TypeCache{},
 	}
-	var s []TypeID
-	scope := 0
-	for i, v := range f.Body {
-		switch v.(type) {
-		case *BeginScope:
-			scope++
-		case *EndScope:
-			scope--
-		}
-		if s, err = v.verify(vv, s[:len(s):len(s)]); err != nil {
-			return fmt.Errorf("%s:%#x: %s", f.NameID, i, err)
+	var v Operation
+	for vv.ip, v = range f.Body {
+		vv.stack = append([]TypeID(nil), vv.stack...)
+		if err = v.verify(vv); err != nil {
+			return fmt.Errorf("%s:%#x: %s", f.NameID, vv.ip, err)
 		}
 	}
-	if scope != 0 {
+	if vv.blockLevel != 0 {
 		return fmt.Errorf("unbalanced BeginScope/EndScope")
 	}
 	return nil
 }
 
 type verifier struct {
-	f *FunctionDefinition
-	c TypeCache
+	blockLevel int
+	function   *FunctionDefinition
+	ip         int
+	stack      []TypeID
+	typeCache  TypeCache
+	variables  []TypeID
 }
