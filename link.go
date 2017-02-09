@@ -125,6 +125,7 @@ func (l *linker) defineFunc(e extern, f *FunctionDefinition) (r int) {
 			*Drop,
 			*EndScope,
 			*Int32Const,
+			*Panic,
 			*Result,
 			*Return,
 			*Store,

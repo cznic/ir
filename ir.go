@@ -122,6 +122,18 @@ func NewFunctionDefinition(p token.Position, name, typeName NameID, typ TypeID, 
 
 // Verify implements Object.
 func (f *FunctionDefinition) Verify() (err error) {
+	switch len(f.Body) {
+	case 0:
+		return fmt.Errorf("function body cannot be empty")
+	case 1:
+		switch f.Body[0].(type) {
+		case *Return, *Panic:
+			return nil
+		}
+
+		return fmt.Errorf("invalid operation")
+	}
+
 	vv := &verifier{
 		function:  f,
 		typeCache: TypeCache{},

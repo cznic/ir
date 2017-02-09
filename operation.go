@@ -31,6 +31,7 @@ var (
 
 // Operation is a unit of execution.
 type Operation interface {
+	Pos() token.Position
 	verify(*verifier) error
 }
 
@@ -41,6 +42,8 @@ type AllocResult struct {
 	TypeName NameID
 	token.Position
 }
+
+func (o *AllocResult) Pos() token.Position { return o.Position }
 
 func (o *AllocResult) verify(v *verifier) error {
 	v.stack = append(v.stack, o.TypeID)
@@ -58,6 +61,8 @@ type Argument struct {
 	TypeID
 	token.Position
 }
+
+func (o *Argument) Pos() token.Position { return o.Position }
 
 func (o *Argument) verify(v *verifier) error {
 	args := v.typeCache.MustType(v.function.TypeID).(*FunctionType).Arguments
@@ -83,10 +88,12 @@ func (o *Argument) String() string {
 
 // Arguments operation annotates that function results, if any, are allocated
 // and a function pointer is at TOS. Evaluation of any function arguments
-// evaluation follows.
+// follows.
 type Arguments struct {
 	token.Position
 }
+
+func (o *Arguments) Pos() token.Position { return o.Position }
 
 func (o *Arguments) verify(v *verifier) error {
 	if len(v.stack) == 0 {
@@ -128,6 +135,8 @@ type BeginScope struct {
 	token.Position
 }
 
+func (o *BeginScope) Pos() token.Position { return o.Position }
+
 func (o *BeginScope) verify(v *verifier) error {
 	if len(v.stack) != 0 {
 		return fmt.Errorf("non empty evaluation stack at scope begin")
@@ -149,6 +158,8 @@ type Call struct {
 	TypeID        // Type of the function pointer.
 	token.Position
 }
+
+func (o *Call) Pos() token.Position { return o.Position }
 
 func (o *Call) verify(v *verifier) error {
 	if len(v.stack) < 1+o.Arguments {
@@ -204,6 +215,8 @@ type Drop struct {
 	token.Position
 }
 
+func (o *Drop) Pos() token.Position { return o.Position }
+
 func (o *Drop) verify(v *verifier) error {
 	if len(v.stack) == 0 {
 		return fmt.Errorf("evaluation stack underflow")
@@ -221,6 +234,8 @@ func (o *Drop) String() string {
 type EndScope struct {
 	token.Position
 }
+
+func (o *EndScope) Pos() token.Position { return o.Position }
 
 func (o *EndScope) verify(v *verifier) error {
 	if len(v.stack) != 0 {
@@ -255,6 +270,8 @@ type Extern struct {
 	token.Position
 }
 
+func (o *Extern) Pos() token.Position { return o.Position }
+
 func (o *Extern) verify(v *verifier) error {
 	//TODO add context to v so that on .Index >= 0 the linker result can be verified.
 	t := v.typeCache.MustType(o.TypeID)
@@ -280,6 +297,8 @@ type Int32Const struct {
 	token.Position
 }
 
+func (o *Int32Const) Pos() token.Position { return o.Position }
+
 func (o *Int32Const) verify(v *verifier) error {
 	v.stack = append(v.stack, TypeID(idInt32))
 	return nil
@@ -289,11 +308,26 @@ func (o *Int32Const) String() string {
 	return fmt.Sprintf("\t%-*s\t%v, int32\t; %s", opw, "const", o.Value, o.Position)
 }
 
+// Panic operation aborts execution with a stack trace.
+type Panic struct {
+	token.Position
+}
+
+func (o *Panic) Pos() token.Position { return o.Position }
+
+func (o *Panic) verify(v *verifier) error { return nil }
+
+func (o *Panic) String() string {
+	return fmt.Sprintf("\t%-*s\t\t; %s", opw, "panic", o.Position)
+}
+
 // Return operation removes all function call arguments from the evaluation
 // stack as well as the function pointer used v.s the call.
 type Return struct {
 	token.Position
 }
+
+func (o *Return) Pos() token.Position { return o.Position }
 
 func (o *Return) verify(v *verifier) error {
 	if len(v.stack) != 0 {
@@ -315,6 +349,8 @@ type Result struct {
 	TypeID
 	token.Position
 }
+
+func (o *Result) Pos() token.Position { return o.Position }
 
 func (o *Result) verify(v *verifier) error {
 	results := v.typeCache.MustType(v.function.TypeID).(*FunctionType).Results
@@ -344,6 +380,8 @@ type Store struct {
 	TypeID
 	token.Position
 }
+
+func (o *Store) Pos() token.Position { return o.Position }
 
 func (o *Store) verify(v *verifier) error {
 	if len(v.stack) < 2 {
@@ -375,6 +413,8 @@ type StringConst struct {
 	token.Position
 }
 
+func (o *StringConst) Pos() token.Position { return o.Position }
+
 func (o *StringConst) verify(v *verifier) error {
 	v.stack = append(v.stack, TypeID(idInt8Ptr))
 	return nil
@@ -392,6 +432,8 @@ type Variable struct {
 	TypeID
 	token.Position
 }
+
+func (o *Variable) Pos() token.Position { return o.Position }
 
 func (o *Variable) verify(v *verifier) error {
 	if o.Index < 0 || o.Index >= len(v.variables) {
@@ -424,6 +466,8 @@ type VariableDeclaration struct {
 	Value
 	token.Position
 }
+
+func (o *VariableDeclaration) Pos() token.Position { return o.Position }
 
 func (o *VariableDeclaration) verify(v *verifier) error {
 	v.variables = append(v.variables, o.TypeID)

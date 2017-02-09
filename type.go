@@ -74,6 +74,9 @@ func (t *TypeBase) setID(id TypeID, p0 []byte, p *[]byte, c TypeCache, u Type) T
 	return u
 }
 
+// String implements fmt.Stringer.
+func (t *TypeBase) String() string { return t.TypeID.String() }
+
 // Pointer implements Type.
 func (t *TypeBase) Pointer() Type { return newPointerType(t) }
 
