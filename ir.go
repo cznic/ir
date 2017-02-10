@@ -136,17 +136,72 @@ func (f *FunctionDefinition) Verify() (err error) {
 
 	vv := &verifier{
 		function:  f,
+		labels:    map[int]struct{}{},
 		typeCache: TypeCache{},
 	}
 	var v Operation
+	ignore := false
 	for vv.ip, v = range f.Body {
 		vv.stack = append([]TypeID(nil), vv.stack...)
-		if err = v.verify(vv); err != nil {
-			return fmt.Errorf("%s:%#x: %s", f.NameID, vv.ip, err)
+		if !ignore {
+			if err = v.verify(vv); err != nil {
+				return fmt.Errorf("%v\n%s:%#x: %v", err, f.NameID, vv.ip, v)
+			}
+		}
+		switch v.(type) {
+		case *Panic:
+			ignore = true
+		case *Label:
+			if ignore {
+				if err = v.verify(vv); err != nil {
+					return fmt.Errorf("%v\n%s:%#x: %v", err, f.NameID, vv.ip, v)
+				}
+			}
+			ignore = false
+		case *BeginScope:
+			if ignore {
+				vv.blockLevel++
+			}
+		case *EndScope:
+			if ignore {
+				vv.blockLevel--
+			}
 		}
 	}
 	if vv.blockLevel != 0 {
 		return fmt.Errorf("unbalanced BeginScope/EndScope")
+	}
+
+	for ip, v := range f.Body {
+		switch x := v.(type) {
+		case *Jmp:
+			n := int(x.NameID)
+			if n == 0 {
+				n = x.Number
+			}
+
+			if _, ok := vv.labels[n]; !ok {
+				return fmt.Errorf("undefined branch target\n%s:%#x: %v", f.NameID, ip, v)
+			}
+		case *Jnz:
+			n := int(x.NameID)
+			if n == 0 {
+				n = x.Number
+			}
+
+			if _, ok := vv.labels[n]; !ok {
+				return fmt.Errorf("undefined branch target\n%s:%#x: %v", f.NameID, ip, v)
+			}
+		case *Jz:
+			n := int(x.NameID)
+			if n == 0 {
+				n = x.Number
+			}
+
+			if _, ok := vv.labels[n]; !ok {
+				return fmt.Errorf("undefined branch target\n%s:%#x: %v", f.NameID, ip, v)
+			}
+		}
 	}
 	return nil
 }
@@ -155,7 +210,46 @@ type verifier struct {
 	blockLevel int
 	function   *FunctionDefinition
 	ip         int
+	labels     map[int]struct{}
 	stack      []TypeID
 	typeCache  TypeCache
 	variables  []TypeID
+}
+
+func (v *verifier) binop() error {
+	n := len(v.stack)
+	if n < 2 {
+		return fmt.Errorf("evaluation stack underflow")
+	}
+
+	a, b := v.stack[n-2], v.stack[n-1]
+	if a != b {
+		return fmt.Errorf("mismatched operand types: %s and %s", a, b)
+	}
+
+	v.stack = append(v.stack[:len(v.stack)-2], a)
+	return nil
+}
+
+func (v *verifier) relop() error {
+	if err := v.binop(); err != nil {
+		return err
+	}
+
+	v.stack[len(v.stack)-1] = TypeID(idInt32)
+	return nil
+}
+
+func (v *verifier) branch() error {
+	n := len(v.stack)
+	if n < 1 {
+		return fmt.Errorf("evaluation stack underflow")
+	}
+
+	if g, e := v.stack[n-1], TypeID(idInt32); g != e {
+		return fmt.Errorf("unexpected branch stack item of type %s (expected %s)", g, e)
+	}
+
+	v.stack = v.stack[:n-1]
+	return nil
 }

@@ -1,6 +1,6 @@
 // Copyright 2017 The IR Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style
-// license that can be found v.s the LICENSE file.
+// license that can be found in the LICENSE file.
 
 package ir
 
@@ -12,19 +12,36 @@ import (
 const opw = 16
 
 var (
+	_ Operation = (*Add)(nil)
 	_ Operation = (*AllocResult)(nil)
 	_ Operation = (*Argument)(nil)
 	_ Operation = (*Arguments)(nil)
 	_ Operation = (*BeginScope)(nil)
+	_ Operation = (*Bool)(nil)
 	_ Operation = (*Call)(nil)
 	_ Operation = (*Drop)(nil)
+	_ Operation = (*Dup)(nil)
+	_ Operation = (*Element)(nil)
 	_ Operation = (*EndScope)(nil)
+	_ Operation = (*Eq)(nil)
 	_ Operation = (*Extern)(nil)
+	_ Operation = (*Field)(nil)
 	_ Operation = (*Int32Const)(nil)
+	_ Operation = (*Jmp)(nil)
+	_ Operation = (*Jnz)(nil)
+	_ Operation = (*Jz)(nil)
+	_ Operation = (*Label)(nil)
+	_ Operation = (*Leq)(nil)
+	_ Operation = (*Load)(nil)
+	_ Operation = (*Lt)(nil)
+	_ Operation = (*Mul)(nil)
+	_ Operation = (*Panic)(nil)
+	_ Operation = (*PostIncrement)(nil)
 	_ Operation = (*Result)(nil)
 	_ Operation = (*Return)(nil)
 	_ Operation = (*Store)(nil)
 	_ Operation = (*StringConst)(nil)
+	_ Operation = (*Sub)(nil)
 	_ Operation = (*Variable)(nil)
 	_ Operation = (*VariableDeclaration)(nil)
 )
@@ -33,6 +50,27 @@ var (
 type Operation interface {
 	Pos() token.Position
 	verify(*verifier) error
+}
+
+// Add operation subtracts the top stack item (b) and the previous one (a) and
+// replaces both operands with a - b.
+type Add struct {
+	TypeID // Operands type.
+	token.Position
+}
+
+func (o *Add) Pos() token.Position { return o.Position }
+
+func (o *Add) verify(v *verifier) error {
+	if o.TypeID == 0 {
+		return fmt.Errorf("missing type")
+	}
+
+	return v.binop()
+}
+
+func (o *Add) String() string {
+	return fmt.Sprintf("\t%-*s\t%s\t; %s", opw, "add", o.TypeID, o.Position)
 }
 
 // AllocResult operation reserves evaluation stack space for a result of type
@@ -46,6 +84,10 @@ type AllocResult struct {
 func (o *AllocResult) Pos() token.Position { return o.Position }
 
 func (o *AllocResult) verify(v *verifier) error {
+	if o.TypeID == 0 {
+		return fmt.Errorf("missing type")
+	}
+
 	v.stack = append(v.stack, o.TypeID)
 	return nil
 }
@@ -65,6 +107,10 @@ type Argument struct {
 func (o *Argument) Pos() token.Position { return o.Position }
 
 func (o *Argument) verify(v *verifier) error {
+	if o.TypeID == 0 {
+		return fmt.Errorf("missing type")
+	}
+
 	args := v.typeCache.MustType(v.function.TypeID).(*FunctionType).Arguments
 	if o.Index < 0 || o.Index >= len(args) {
 		return fmt.Errorf("invalid argument index")
@@ -150,6 +196,36 @@ func (o *BeginScope) String() string {
 	return fmt.Sprintf("\t%-*s\t\t; %s", opw, "beginScope", o.Position)
 }
 
+// Bool operation converts TOS to a bool (ie. an int32).
+type Bool struct {
+	TypeID // Operand type.
+	token.Position
+}
+
+func (o *Bool) Pos() token.Position { return o.Position }
+
+func (o *Bool) verify(v *verifier) error {
+	if o.TypeID == 0 {
+		return fmt.Errorf("missing type")
+	}
+
+	n := len(v.stack)
+	if n == 0 {
+		return fmt.Errorf("evaluation stack underflow")
+	}
+
+	if g, e := v.stack[n-1], o.TypeID; g != e {
+		return fmt.Errorf("mismatched types, got %s, expected %s", g, e)
+	}
+
+	v.stack[n-1] = TypeID(idInt32)
+	return nil
+}
+
+func (o *Bool) String() string {
+	return fmt.Sprintf("\t%-*s\t%s\t; %s", opw, "bool", o.TypeID, o.Position)
+}
+
 // Call operation performs a function call. The evaluation stack contains the
 // space reseved for function results, is any, the function pointer and any
 // function arguments.
@@ -162,6 +238,10 @@ type Call struct {
 func (o *Call) Pos() token.Position { return o.Position }
 
 func (o *Call) verify(v *verifier) error {
+	if o.TypeID == 0 {
+		return fmt.Errorf("missing type")
+	}
+
 	if len(v.stack) < 1+o.Arguments {
 		return fmt.Errorf("evaluation stack underflow")
 	}
@@ -218,6 +298,10 @@ type Drop struct {
 func (o *Drop) Pos() token.Position { return o.Position }
 
 func (o *Drop) verify(v *verifier) error {
+	if o.TypeID == 0 {
+		return fmt.Errorf("missing type")
+	}
+
 	if len(v.stack) == 0 {
 		return fmt.Errorf("evaluation stack underflow")
 	}
@@ -228,6 +312,88 @@ func (o *Drop) verify(v *verifier) error {
 
 func (o *Drop) String() string {
 	return fmt.Sprintf("\t%-*s\t%s\t; %s", opw, "drop", o.TypeID, o.Position)
+}
+
+// Dup operation duplicates the top stack item.
+type Dup struct {
+	TypeID
+	token.Position
+}
+
+func (o *Dup) Pos() token.Position { return o.Position }
+
+func (o *Dup) verify(v *verifier) error {
+	if o.TypeID == 0 {
+		return fmt.Errorf("missing type")
+	}
+
+	if len(v.stack) == 0 {
+		return fmt.Errorf("evaluation stack underflow")
+	}
+
+	v.stack = append(v.stack, v.stack[len(v.stack)-1])
+	return nil
+}
+
+func (o *Dup) String() string {
+	return fmt.Sprintf("\t%-*s\t%s\t; %s", opw, "dup", o.TypeID, o.Position)
+}
+
+// Element replaces a pointer and index with the indexed element or its address.
+type Element struct {
+	Address   bool
+	IndexType TypeID
+	TypeID    // The indexed type.
+	token.Position
+}
+
+func (o *Element) Pos() token.Position { return o.Position }
+
+func (o *Element) verify(v *verifier) error {
+	if o.TypeID == 0 {
+		return fmt.Errorf("missing type")
+	}
+
+	if o.IndexType == 0 {
+		return fmt.Errorf("missing index type")
+	}
+
+	switch t := v.typeCache.MustType(o.IndexType); t.Kind() {
+	case Int8, Int16, Int32, Int64, Uint8, Uint16, Uint32, Uint64:
+		// ok
+	default:
+		return fmt.Errorf("invalid index type %s", t.ID())
+	}
+
+	n := len(v.stack)
+	if n < 2 {
+		return fmt.Errorf("evaluation stack underflow")
+	}
+
+	if g, e := o.TypeID, v.stack[n-2]; g != e {
+		return fmt.Errorf("mismatched types, got %s, expected %s", g, e)
+	}
+
+	pt := v.typeCache.MustType(o.TypeID)
+	if pt.Kind() != Pointer {
+		return fmt.Errorf("expected a pointer type, have %v", o.TypeID)
+	}
+
+	t := pt.(*PointerType).Element
+	if o.Address {
+		t = t.Pointer()
+	}
+	v.stack = append(v.stack[:n-2], t.ID())
+	return nil
+}
+
+func (o *Element) String() string {
+	switch {
+	case o.Address:
+		return fmt.Sprintf("\t%-*s\t&[%v], %v\t; %s", opw, "element", o.IndexType, o.TypeID, o.Position)
+	default:
+		return fmt.Sprintf("\t%-*s\t[%v], %v\t; %s", opw, "element", o.IndexType, o.TypeID, o.Position)
+	}
 }
 
 // EndScope operation annotates leaving a block scope.
@@ -260,6 +426,28 @@ func (o *EndScope) String() string {
 	return fmt.Sprintf("\t%-*s\t\t; %s", opw, "endScope", o.Position)
 }
 
+// Eq operation compares the top stack item (b) and the previous one (a) and
+// replaces both operands with a non zero int32 value if a == b or zero
+// otherwise.
+type Eq struct {
+	TypeID // Operands type.
+	token.Position
+}
+
+func (o *Eq) Pos() token.Position { return o.Position }
+
+func (o *Eq) verify(v *verifier) error {
+	if o.TypeID == 0 {
+		return fmt.Errorf("missing type")
+	}
+
+	return v.relop()
+}
+
+func (o *Eq) String() string {
+	return fmt.Sprintf("\t%-*s\t%s\t; %s", opw, "eq", o.TypeID, o.Position)
+}
+
 // Extern operation pushes an external definition on the evaluation stack.
 type Extern struct {
 	Address bool
@@ -273,6 +461,10 @@ type Extern struct {
 func (o *Extern) Pos() token.Position { return o.Position }
 
 func (o *Extern) verify(v *verifier) error {
+	if o.TypeID == 0 {
+		return fmt.Errorf("missing type")
+	}
+
 	//TODO add context to v so that on .Index >= 0 the linker result can be verified.
 	t := v.typeCache.MustType(o.TypeID)
 	if o.Address && t.Kind() != Pointer {
@@ -289,6 +481,63 @@ func (o *Extern) String() string {
 		s = fmt.Sprintf("%v, ", o.Index)
 	}
 	return fmt.Sprintf("extern\t%-*s\t%s\t; %s %s", opw, s+addr(o.Address)+o.NameID.String(), o.TypeID, o.TypeName, o.Position)
+}
+
+// Field replaces a struct/union pointer at TOS with its field by index, or its
+// address.
+type Field struct {
+	Address bool
+	Index   int
+	TypeID  // Pointer to a struct/union.
+	token.Position
+}
+
+func (o *Field) Pos() token.Position { return o.Position }
+
+func (o *Field) verify(v *verifier) error {
+	if o.TypeID == 0 {
+		return fmt.Errorf("missing type")
+	}
+
+	n := len(v.stack)
+	if n == 0 {
+		return fmt.Errorf("evaluation stack underflow")
+	}
+
+	if g, e := o.TypeID, v.stack[n-1]; g != e {
+		return fmt.Errorf("mismatched field pointer types, got %s, expected %s", g, e)
+	}
+
+	pt := v.typeCache.MustType(o.TypeID)
+	if pt.Kind() != Pointer {
+		return fmt.Errorf("expected a pointer type, have %v", o.TypeID)
+	}
+
+	t := pt.(*PointerType).Element
+	if t.Kind() != Struct && t.Kind() != Union {
+		return fmt.Errorf("expected a pointer to a struct/union, have %v", o.TypeID)
+	}
+
+	st := t.(*StructOrUnionType)
+	if o.Index >= len(st.Fields) {
+		return fmt.Errorf("invalid index")
+	}
+
+	t = st.Fields[o.Index]
+	if o.Address {
+		t = t.Pointer()
+	}
+	v.stack[n-1] = t.ID()
+	return nil
+}
+
+func (o *Field) String() string {
+	switch {
+	case o.Address:
+		return fmt.Sprintf("\t%-*s\t&%v, %v\t; %s", opw, "field", o.Index, o.TypeID, o.Position)
+	default:
+		return fmt.Sprintf("\t%-*s\t%v, %v\t; %s", opw, "field", o.Index, o.TypeID, o.Position)
+	}
 }
 
 // Int32Const operation pushes an int32 literal on the evaluation stack.
@@ -308,6 +557,197 @@ func (o *Int32Const) String() string {
 	return fmt.Sprintf("\t%-*s\t%v, int32\t; %s", opw, "const", o.Value, o.Position)
 }
 
+// Jmp operation performs a branch to a named or numbered label.
+type Jmp struct {
+	NameID
+	Number int
+	token.Position
+}
+
+func (o *Jmp) Pos() token.Position { return o.Position }
+
+func (o *Jmp) verify(v *verifier) error { return nil }
+
+func (o *Jmp) String() string {
+	switch {
+	case o.NameID != 0:
+		return fmt.Sprintf("\t%-*s\t%v\t; %s", opw, "jmp", o.NameID, o.Position)
+	default:
+		return fmt.Sprintf("\t%-*s\t%v\t; %s", opw, "jmp", o.Number, o.Position)
+	}
+}
+
+// Jnz operation performs a branch to a named or numbered label if the top of
+// the stack is non zero. The TOS type must be int32 and the operation removes
+// TOS.
+type Jnz struct {
+	NameID
+	Number int
+	token.Position
+}
+
+func (o *Jnz) Pos() token.Position { return o.Position }
+
+func (o *Jnz) verify(v *verifier) error { return v.branch() }
+
+func (o *Jnz) String() string {
+	switch {
+	case o.NameID != 0:
+		return fmt.Sprintf("\t%-*s\t%v\t; %s", opw, "jnz", o.NameID, o.Position)
+	default:
+		return fmt.Sprintf("\t%-*s\t%v\t; %s", opw, "jnz", o.Number, o.Position)
+	}
+}
+
+// Jz operation performs a branch to a named or numbered label if the top of
+// the stack is zero. The TOS type must be int32 and the operation removes TOS.
+type Jz struct {
+	NameID
+	Number int
+	token.Position
+}
+
+func (o *Jz) Pos() token.Position { return o.Position }
+
+func (o *Jz) verify(v *verifier) error { return v.branch() }
+
+func (o *Jz) String() string {
+	switch {
+	case o.NameID != 0:
+		return fmt.Sprintf("\t%-*s\t%v\t; %s", opw, "jz", o.NameID, o.Position)
+	default:
+		return fmt.Sprintf("\t%-*s\t%v\t; %s", opw, "jz", o.Number, o.Position)
+	}
+}
+
+// Label operation declares a named or numbered branch target.
+type Label struct {
+	NameID
+	Number int
+	token.Position
+}
+
+func (o *Label) Pos() token.Position { return o.Position }
+
+func (o *Label) verify(v *verifier) error {
+	n := int(o.NameID)
+	if n == 0 {
+		n = o.Number
+	}
+	if _, ok := v.labels[n]; ok {
+		return fmt.Errorf("label redefined")
+	}
+
+	v.labels[n] = struct{}{}
+	return nil
+}
+
+func (o *Label) String() string {
+	switch {
+	case o.NameID != 0:
+		return fmt.Sprintf("%v:\t\t\t; %s", o.NameID, o.Position)
+	default:
+		return fmt.Sprintf("%v:\t\t\t; %s", o.Number, o.Position)
+	}
+}
+
+// Leq operation compares the top stack item (b) and the previous one (a) and
+// replaces both operands with a non zero int32 value if a <= b or zero
+// otherwise.
+type Leq struct {
+	TypeID // Operands type.
+	token.Position
+}
+
+func (o *Leq) Pos() token.Position { return o.Position }
+
+func (o *Leq) verify(v *verifier) error {
+	if o.TypeID == 0 {
+		return fmt.Errorf("missing type")
+	}
+
+	return v.relop()
+}
+
+func (o *Leq) String() string {
+	return fmt.Sprintf("\t%-*s\t%s\t; %s", opw, "leq", o.TypeID, o.Position)
+}
+
+// Load replaces a pointer at TOS by its pointee
+type Load struct {
+	TypeID // Pointer type.
+	token.Position
+}
+
+func (o *Load) Pos() token.Position { return o.Position }
+
+func (o *Load) verify(v *verifier) error {
+	if o.TypeID == 0 {
+		return fmt.Errorf("missing type")
+	}
+
+	n := len(v.stack)
+	if n == 0 {
+		return fmt.Errorf("evaluation stack underflow")
+	}
+
+	if g, e := o.TypeID, v.stack[n-1]; g != e {
+		return fmt.Errorf("mismatched types, got %s, expected %s", g, e)
+	}
+
+	pt := v.typeCache.MustType(o.TypeID)
+	if pt.Kind() != Pointer {
+		return fmt.Errorf("expected a pointer type, have %v", o.TypeID)
+	}
+
+	t := pt.(*PointerType).Element
+	v.stack[n-1] = t.ID()
+	return nil
+}
+
+// Lt operation compares the top stack item (b) and the previous one (a) and
+// replaces both operands with a non zero int32 value if a < b or zero
+// otherwise.
+type Lt struct {
+	TypeID // Operands type.
+	token.Position
+}
+
+func (o *Lt) Pos() token.Position { return o.Position }
+
+func (o *Lt) verify(v *verifier) error {
+	if o.TypeID == 0 {
+		return fmt.Errorf("missing type")
+	}
+
+	return v.relop()
+}
+
+func (o *Lt) String() string {
+	return fmt.Sprintf("\t%-*s\t%s\t; %s", opw, "lt", o.TypeID, o.Position)
+}
+
+// Mul operation subtracts the top stack item (b) and the previous one (a) and
+// replaces both operands with a * b.
+type Mul struct {
+	TypeID // Operands type.
+	token.Position
+}
+
+func (o *Mul) Pos() token.Position { return o.Position }
+
+func (o *Mul) verify(v *verifier) error {
+	if o.TypeID == 0 {
+		return fmt.Errorf("missing type")
+	}
+
+	return v.binop()
+}
+
+func (o *Mul) String() string {
+	return fmt.Sprintf("\t%-*s\t%s\t; %s", opw, "mul", o.TypeID, o.Position)
+}
+
 // Panic operation aborts execution with a stack trace.
 type Panic struct {
 	token.Position
@@ -321,24 +761,47 @@ func (o *Panic) String() string {
 	return fmt.Sprintf("\t%-*s\t\t; %s", opw, "panic", o.Position)
 }
 
-// Return operation removes all function call arguments from the evaluation
-// stack as well as the function pointer used v.s the call.
-type Return struct {
+// PostIncrement operation adds Delta to the value pointed to by address at TOS
+// and replaces TOS by the value pointee had before the increment.
+type PostIncrement struct {
+	Delta  int
+	TypeID // Operand type.
 	token.Position
 }
 
-func (o *Return) Pos() token.Position { return o.Position }
+func (o *PostIncrement) Pos() token.Position { return o.Position }
 
-func (o *Return) verify(v *verifier) error {
-	if len(v.stack) != 0 {
-		return fmt.Errorf("non empty evaluation stack on return: %v", v.stack)
+func (o *PostIncrement) verify(v *verifier) error {
+	if o.TypeID == 0 {
+		return fmt.Errorf("missing type")
 	}
 
+	n := len(v.stack)
+	if n == 0 {
+		return fmt.Errorf("evaluation stack underflow")
+	}
+
+	t := v.typeCache.MustType(v.stack[n-1])
+	if t.Kind() != Pointer {
+		return fmt.Errorf("expected a pointer at TOS, got %s ", v.stack[n-1])
+	}
+
+	t = t.(*PointerType).Element
+	switch t.Kind() {
+	case Array, Union, Struct, Function:
+		return fmt.Errorf("invalid operand type %s ", v.stack[n-1])
+	}
+
+	if g, e := o.TypeID, t.ID(); g != e {
+		return fmt.Errorf("mismatched operand types %s and %s", g, e)
+	}
+
+	v.stack[n-1] = o.TypeID
 	return nil
 }
 
-func (o *Return) String() string {
-	return fmt.Sprintf("\t%-*s\t\t; %s", opw, "return", o.Position)
+func (o *PostIncrement) String() string {
+	return fmt.Sprintf("\t%-*s\t%v\t; %s", opw, o.TypeID.String()+"++", o.Delta, o.Position)
 }
 
 // Result pushes a function result by index, or its address, to the evaluation
@@ -353,6 +816,10 @@ type Result struct {
 func (o *Result) Pos() token.Position { return o.Position }
 
 func (o *Result) verify(v *verifier) error {
+	if o.TypeID == 0 {
+		return fmt.Errorf("missing type")
+	}
+
 	results := v.typeCache.MustType(v.function.TypeID).(*FunctionType).Results
 	if o.Index < 0 || o.Index >= len(results) {
 		return fmt.Errorf("invalid result index")
@@ -374,7 +841,27 @@ func (o *Result) String() string {
 	return fmt.Sprintf("\t%-*s\t%s%v, %v\t; %s", opw, "result", addr(o.Address), o.Index, o.TypeID, o.Position)
 }
 
-// Store operation stores a TOS value at address v.s the preceding stack
+// Return operation removes all function call arguments from the evaluation
+// stack as well as the function pointer used in the call.
+type Return struct {
+	token.Position
+}
+
+func (o *Return) Pos() token.Position { return o.Position }
+
+func (o *Return) verify(v *verifier) error {
+	if len(v.stack) != 0 {
+		return fmt.Errorf("non empty evaluation stack on return: %v", v.stack)
+	}
+
+	return nil
+}
+
+func (o *Return) String() string {
+	return fmt.Sprintf("\t%-*s\t\t; %s", opw, "return", o.Position)
+}
+
+// Store operation stores a TOS value at address in the preceding stack
 // position.  The address is removed from the evaluation stack.
 type Store struct {
 	TypeID
@@ -384,6 +871,10 @@ type Store struct {
 func (o *Store) Pos() token.Position { return o.Position }
 
 func (o *Store) verify(v *verifier) error {
+	if o.TypeID == 0 {
+		return fmt.Errorf("missing type")
+	}
+
 	if len(v.stack) < 2 {
 		return fmt.Errorf("evaluation stack underflow")
 	}
@@ -396,6 +887,10 @@ func (o *Store) verify(v *verifier) error {
 	}
 
 	if g, e := pt.(*PointerType).Element.ID(), v.stack[p+1]; g != e {
+		return fmt.Errorf("mismatched address and value type: %s and %s", g, e)
+	}
+
+	if g, e := o.TypeID, v.stack[p+1]; g != e {
 		return fmt.Errorf("mismatched address and value type: %s and %s", g, e)
 	}
 
@@ -424,6 +919,27 @@ func (o *StringConst) String() string {
 	return fmt.Sprintf("\t%-*s\t%q, %s\t; %s", opw, "const", o.Value, dict.S(idInt8Ptr), o.Position)
 }
 
+// Sub operation subtracts the top stack item (b) and the previous one (a) and
+// replaces both operands with a - b.
+type Sub struct {
+	TypeID // Operands type.
+	token.Position
+}
+
+func (o *Sub) Pos() token.Position { return o.Position }
+
+func (o *Sub) verify(v *verifier) error {
+	if o.TypeID == 0 {
+		return fmt.Errorf("missing type")
+	}
+
+	return v.binop()
+}
+
+func (o *Sub) String() string {
+	return fmt.Sprintf("\t%-*s\t%s\t; %s", opw, "sub", o.TypeID, o.Position)
+}
+
 // Variable pushes a function local variable by index, or its address, to the
 // evaluation stack.
 type Variable struct {
@@ -436,13 +952,22 @@ type Variable struct {
 func (o *Variable) Pos() token.Position { return o.Position }
 
 func (o *Variable) verify(v *verifier) error {
+	if o.TypeID == 0 {
+		return fmt.Errorf("missing type")
+	}
+
 	if o.Index < 0 || o.Index >= len(v.variables) {
 		return fmt.Errorf("invalid variable index")
 	}
 
 	t := v.typeCache.MustType(v.variables[o.Index])
 	if o.Address {
-		t = t.Pointer()
+		switch {
+		case t.Kind() == Array:
+			t = t.(*ArrayType).Item.Pointer()
+		default:
+			t = t.Pointer()
+		}
 	}
 	if g, e := o.TypeID, t.ID(); g != e {
 		return fmt.Errorf("expected type %s", e)
@@ -470,6 +995,10 @@ type VariableDeclaration struct {
 func (o *VariableDeclaration) Pos() token.Position { return o.Position }
 
 func (o *VariableDeclaration) verify(v *verifier) error {
+	if o.TypeID == 0 {
+		return fmt.Errorf("missing type")
+	}
+
 	v.variables = append(v.variables, o.TypeID)
 	return nil
 }

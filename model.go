@@ -105,12 +105,12 @@ func (m MemoryModel) Alignof(t Type) int {
 }
 
 // Layout computes the memory layout of t.
-func (m MemoryModel) Layout(t *StructOrUnionType) []Field {
+func (m MemoryModel) Layout(t *StructOrUnionType) []FieldProperties {
 	if len(t.Fields) == 0 {
 		return nil
 	}
 
-	r := make([]Field, len(t.Fields))
+	r := make([]FieldProperties, len(t.Fields))
 	switch t.Kind() {
 	case Struct:
 		var off int64
@@ -122,7 +122,7 @@ func (m MemoryModel) Layout(t *StructOrUnionType) []Field {
 			if off != z {
 				r[i-1].Padding = int(off - z)
 			}
-			r[i] = Field{Offset: off, Size: sz}
+			r[i] = FieldProperties{Offset: off, Size: sz}
 			off += sz
 		}
 		z := off
@@ -134,7 +134,7 @@ func (m MemoryModel) Layout(t *StructOrUnionType) []Field {
 		var sz int64
 		for i, v := range t.Fields {
 			n := m.Sizeof(v)
-			r[i] = Field{Size: n}
+			r[i] = FieldProperties{Size: n}
 			if n > sz {
 				sz = n
 			}
@@ -212,12 +212,12 @@ func (m MemoryModel) StructAlignof(t Type) int {
 	}
 }
 
-// Field is an item of the result produced by MemoryModel.Layout.
-type Field struct {
+// FieldProperties describes a struct/union field.
+type FieldProperties struct {
 	Offset  int64 // Relative to start of the struct/union.
 	Size    int64 // Field size for copying.
 	Padding int   // Adjustment to enforce proper alignment.
 }
 
 // Sizeof returns the sum of f.Size and f.Padding.
-func (f *Field) Sizeof() int64 { return f.Size + int64(f.Padding) }
+func (f *FieldProperties) Sizeof() int64 { return f.Size + int64(f.Padding) }

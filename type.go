@@ -552,7 +552,7 @@ func (c TypeCache) Type(id TypeID) (Type, error) {
 func (c TypeCache) MustType(id TypeID) Type {
 	t, err := c.Type(id)
 	if err != nil {
-		panic(err)
+		panic(fmt.Errorf("%q: %v", id, err))
 	}
 
 	return t

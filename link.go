@@ -117,19 +117,33 @@ func (l *linker) defineFunc(e extern, f *FunctionDefinition) (r int) {
 	for ip, v := range f.Body {
 		switch x := v.(type) {
 		case
+			*Add,
 			*AllocResult,
 			*Argument,
 			*Arguments,
 			*BeginScope,
 			*Call,
 			*Drop,
+			*Dup,
+			*Element,
 			*EndScope,
+			*Eq,
+			*Field,
 			*Int32Const,
+			*Jmp,
+			*Jnz,
+			*Jz,
+			*Label,
+			*Leq,
+			*Lt,
+			*Mul,
 			*Panic,
+			*PostIncrement,
 			*Result,
 			*Return,
 			*Store,
 			*StringConst,
+			*Sub,
 			*Variable,
 			*VariableDeclaration:
 			// nop
