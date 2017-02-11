@@ -110,6 +110,29 @@ func (l *linker) collectSymbols() {
 	}
 }
 
+func (l *linker) initializer(op *VariableDeclaration) {
+	switch x := op.Value.(type) {
+	case
+		*Int32Value,
+		nil:
+		// ok
+	case *AddressValue:
+		switch x.Linkage {
+		case ExternalLinkage:
+			e, ok := l.extern[x.NameID]
+			if !ok {
+				panic(fmt.Errorf("%s: undefined extern %s", op.Position, x.NameID))
+			}
+
+			x.Index = l.define(e)
+		default:
+			panic(fmt.Errorf("internal error %s", x.Linkage))
+		}
+	default:
+		panic(fmt.Errorf("internal error: %T", x))
+	}
+}
+
 func (l *linker) defineFunc(e extern, f *FunctionDefinition) (r int) {
 	r = len(l.out)
 	l.defined[e] = r
@@ -135,6 +158,7 @@ func (l *linker) defineFunc(e extern, f *FunctionDefinition) (r int) {
 			*Jz,
 			*Label,
 			*Leq,
+			*Load,
 			*Lt,
 			*Mul,
 			*Panic,
@@ -144,8 +168,7 @@ func (l *linker) defineFunc(e extern, f *FunctionDefinition) (r int) {
 			*Store,
 			*StringConst,
 			*Sub,
-			*Variable,
-			*VariableDeclaration:
+			*Variable:
 			// nop
 		case *Extern:
 			switch ex, ok := l.extern[x.NameID]; {
@@ -154,10 +177,29 @@ func (l *linker) defineFunc(e extern, f *FunctionDefinition) (r int) {
 			default:
 				panic("TODO")
 			}
+		case *VariableDeclaration:
+			l.initializer(x)
 		default:
 			panic(fmt.Errorf("internal error: %T %s %#05x %v", x, f.NameID, ip, x))
 		}
 	}
+	return r
+}
+
+func (l *linker) defineData(e extern, d *DataDefinition) (r int) {
+	r = len(l.out)
+	l.defined[e] = r
+	l.out = append(l.out, d)
+	var f func(Value)
+	f = func(v Value) {
+		switch x := v.(type) {
+		case nil:
+			// nop
+		default:
+			panic(fmt.Errorf("internal error: %T", x))
+		}
+	}
+	f(d.Value)
 	return r
 }
 
@@ -167,6 +209,8 @@ func (l *linker) define(e extern) int {
 	}
 
 	switch x := l.in[e.unit][e.index].(type) {
+	case *DataDefinition:
+		return l.defineData(e, x)
 	case *FunctionDefinition:
 		return l.defineFunc(e, x)
 	default:

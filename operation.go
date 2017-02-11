@@ -59,6 +59,7 @@ type Add struct {
 	token.Position
 }
 
+// Pos implements Operation.
 func (o *Add) Pos() token.Position { return o.Position }
 
 func (o *Add) verify(v *verifier) error {
@@ -81,6 +82,7 @@ type AllocResult struct {
 	token.Position
 }
 
+// Pos implements Operation.
 func (o *AllocResult) Pos() token.Position { return o.Position }
 
 func (o *AllocResult) verify(v *verifier) error {
@@ -104,6 +106,7 @@ type Argument struct {
 	token.Position
 }
 
+// Pos implements Operation.
 func (o *Argument) Pos() token.Position { return o.Position }
 
 func (o *Argument) verify(v *verifier) error {
@@ -139,6 +142,7 @@ type Arguments struct {
 	token.Position
 }
 
+// Pos implements Operation.
 func (o *Arguments) Pos() token.Position { return o.Position }
 
 func (o *Arguments) verify(v *verifier) error {
@@ -181,6 +185,7 @@ type BeginScope struct {
 	token.Position
 }
 
+// Pos implements Operation.
 func (o *BeginScope) Pos() token.Position { return o.Position }
 
 func (o *BeginScope) verify(v *verifier) error {
@@ -202,6 +207,7 @@ type Bool struct {
 	token.Position
 }
 
+// Pos implements Operation.
 func (o *Bool) Pos() token.Position { return o.Position }
 
 func (o *Bool) verify(v *verifier) error {
@@ -235,6 +241,7 @@ type Call struct {
 	token.Position
 }
 
+// Pos implements Operation.
 func (o *Call) Pos() token.Position { return o.Position }
 
 func (o *Call) verify(v *verifier) error {
@@ -295,6 +302,7 @@ type Drop struct {
 	token.Position
 }
 
+// Pos implements Operation.
 func (o *Drop) Pos() token.Position { return o.Position }
 
 func (o *Drop) verify(v *verifier) error {
@@ -320,6 +328,7 @@ type Dup struct {
 	token.Position
 }
 
+// Pos implements Operation.
 func (o *Dup) Pos() token.Position { return o.Position }
 
 func (o *Dup) verify(v *verifier) error {
@@ -347,6 +356,7 @@ type Element struct {
 	token.Position
 }
 
+// Pos implements Operation.
 func (o *Element) Pos() token.Position { return o.Position }
 
 func (o *Element) verify(v *verifier) error {
@@ -401,6 +411,7 @@ type EndScope struct {
 	token.Position
 }
 
+// Pos implements Operation.
 func (o *EndScope) Pos() token.Position { return o.Position }
 
 func (o *EndScope) verify(v *verifier) error {
@@ -434,6 +445,7 @@ type Eq struct {
 	token.Position
 }
 
+// Pos implements Operation.
 func (o *Eq) Pos() token.Position { return o.Position }
 
 func (o *Eq) verify(v *verifier) error {
@@ -458,6 +470,7 @@ type Extern struct {
 	token.Position
 }
 
+// Pos implements Operation.
 func (o *Extern) Pos() token.Position { return o.Position }
 
 func (o *Extern) verify(v *verifier) error {
@@ -492,6 +505,7 @@ type Field struct {
 	token.Position
 }
 
+// Pos implements Operation.
 func (o *Field) Pos() token.Position { return o.Position }
 
 func (o *Field) verify(v *verifier) error {
@@ -546,6 +560,7 @@ type Int32Const struct {
 	token.Position
 }
 
+// Pos implements Operation.
 func (o *Int32Const) Pos() token.Position { return o.Position }
 
 func (o *Int32Const) verify(v *verifier) error {
@@ -564,6 +579,7 @@ type Jmp struct {
 	token.Position
 }
 
+// Pos implements Operation.
 func (o *Jmp) Pos() token.Position { return o.Position }
 
 func (o *Jmp) verify(v *verifier) error { return nil }
@@ -586,6 +602,7 @@ type Jnz struct {
 	token.Position
 }
 
+// Pos implements Operation.
 func (o *Jnz) Pos() token.Position { return o.Position }
 
 func (o *Jnz) verify(v *verifier) error { return v.branch() }
@@ -607,6 +624,7 @@ type Jz struct {
 	token.Position
 }
 
+// Pos implements Operation.
 func (o *Jz) Pos() token.Position { return o.Position }
 
 func (o *Jz) verify(v *verifier) error { return v.branch() }
@@ -627,6 +645,7 @@ type Label struct {
 	token.Position
 }
 
+// Pos implements Operation.
 func (o *Label) Pos() token.Position { return o.Position }
 
 func (o *Label) verify(v *verifier) error {
@@ -659,6 +678,7 @@ type Leq struct {
 	token.Position
 }
 
+// Pos implements Operation.
 func (o *Leq) Pos() token.Position { return o.Position }
 
 func (o *Leq) verify(v *verifier) error {
@@ -673,12 +693,13 @@ func (o *Leq) String() string {
 	return fmt.Sprintf("\t%-*s\t%s\t; %s", opw, "leq", o.TypeID, o.Position)
 }
 
-// Load replaces a pointer at TOS by its pointee
+// Load replaces a pointer at TOS by its pointee.
 type Load struct {
 	TypeID // Pointer type.
 	token.Position
 }
 
+// Pos implements Operation.
 func (o *Load) Pos() token.Position { return o.Position }
 
 func (o *Load) verify(v *verifier) error {
@@ -705,6 +726,10 @@ func (o *Load) verify(v *verifier) error {
 	return nil
 }
 
+func (o *Load) String() string {
+	return fmt.Sprintf("\t%-*s\t%s\t; %s", opw, "load", o.TypeID, o.Position)
+}
+
 // Lt operation compares the top stack item (b) and the previous one (a) and
 // replaces both operands with a non zero int32 value if a < b or zero
 // otherwise.
@@ -713,6 +738,7 @@ type Lt struct {
 	token.Position
 }
 
+// Pos implements Operation.
 func (o *Lt) Pos() token.Position { return o.Position }
 
 func (o *Lt) verify(v *verifier) error {
@@ -734,6 +760,7 @@ type Mul struct {
 	token.Position
 }
 
+// Pos implements Operation.
 func (o *Mul) Pos() token.Position { return o.Position }
 
 func (o *Mul) verify(v *verifier) error {
@@ -753,6 +780,7 @@ type Panic struct {
 	token.Position
 }
 
+// Pos implements Operation.
 func (o *Panic) Pos() token.Position { return o.Position }
 
 func (o *Panic) verify(v *verifier) error { return nil }
@@ -769,6 +797,7 @@ type PostIncrement struct {
 	token.Position
 }
 
+// Pos implements Operation.
 func (o *PostIncrement) Pos() token.Position { return o.Position }
 
 func (o *PostIncrement) verify(v *verifier) error {
@@ -813,6 +842,7 @@ type Result struct {
 	token.Position
 }
 
+// Pos implements Operation.
 func (o *Result) Pos() token.Position { return o.Position }
 
 func (o *Result) verify(v *verifier) error {
@@ -847,6 +877,7 @@ type Return struct {
 	token.Position
 }
 
+// Pos implements Operation.
 func (o *Return) Pos() token.Position { return o.Position }
 
 func (o *Return) verify(v *verifier) error {
@@ -868,6 +899,7 @@ type Store struct {
 	token.Position
 }
 
+// Pos implements Operation.
 func (o *Store) Pos() token.Position { return o.Position }
 
 func (o *Store) verify(v *verifier) error {
@@ -908,6 +940,7 @@ type StringConst struct {
 	token.Position
 }
 
+// Pos implements Operation.
 func (o *StringConst) Pos() token.Position { return o.Position }
 
 func (o *StringConst) verify(v *verifier) error {
@@ -926,6 +959,7 @@ type Sub struct {
 	token.Position
 }
 
+// Pos implements Operation.
 func (o *Sub) Pos() token.Position { return o.Position }
 
 func (o *Sub) verify(v *verifier) error {
@@ -949,6 +983,7 @@ type Variable struct {
 	token.Position
 }
 
+// Pos implements Operation.
 func (o *Variable) Pos() token.Position { return o.Position }
 
 func (o *Variable) verify(v *verifier) error {
@@ -992,6 +1027,7 @@ type VariableDeclaration struct {
 	token.Position
 }
 
+// Pos implements Operation.
 func (o *VariableDeclaration) Pos() token.Position { return o.Position }
 
 func (o *VariableDeclaration) verify(v *verifier) error {
@@ -1007,7 +1043,7 @@ func (o *VariableDeclaration) String() string {
 	var s string
 	switch {
 	case o.Value != nil:
-		s = fmt.Sprintf("(%v)(%v)", o.TypeID, o.Value)
+		s = fmt.Sprintf("%v(%v)", o.TypeID, o.Value)
 	default:
 		s = fmt.Sprintf("%v", o.TypeID)
 	}

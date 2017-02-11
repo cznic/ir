@@ -83,6 +83,8 @@ var (
 	}
 )
 
+// PrettyString turns certain thing produced by this package into neatly format
+// text.
 func PrettyString(v interface{}) string {
 	switch x := v.(type) {
 	case *BeginScope:
