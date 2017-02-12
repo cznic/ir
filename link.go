@@ -113,7 +113,9 @@ func (l *linker) collectSymbols() {
 func (l *linker) initializer(op *VariableDeclaration) {
 	switch x := op.Value.(type) {
 	case
+		*Float64Value,
 		*Int32Value,
+		*StringValue,
 		nil:
 		// ok
 	case *AddressValue:
@@ -129,7 +131,7 @@ func (l *linker) initializer(op *VariableDeclaration) {
 			panic(fmt.Errorf("internal error %s", x.Linkage))
 		}
 	default:
-		panic(fmt.Errorf("internal error: %T", x))
+		panic(fmt.Errorf("internal error: %T %v", x, op))
 	}
 }
 
@@ -142,16 +144,20 @@ func (l *linker) defineFunc(e extern, f *FunctionDefinition) (r int) {
 		case
 			*Add,
 			*AllocResult,
+			*And,
 			*Argument,
 			*Arguments,
 			*BeginScope,
 			*Call,
+			*Convert,
+			*Div,
 			*Drop,
 			*Dup,
 			*Element,
 			*EndScope,
 			*Eq,
 			*Field,
+			*Float64Const,
 			*Int32Const,
 			*Jmp,
 			*Jnz,
@@ -161,6 +167,9 @@ func (l *linker) defineFunc(e extern, f *FunctionDefinition) (r int) {
 			*Load,
 			*Lt,
 			*Mul,
+			*Neq,
+			*Nil,
+			*Or,
 			*Panic,
 			*PostIncrement,
 			*Result,
@@ -168,7 +177,8 @@ func (l *linker) defineFunc(e extern, f *FunctionDefinition) (r int) {
 			*Store,
 			*StringConst,
 			*Sub,
-			*Variable:
+			*Variable,
+			*Xor:
 			// nop
 		case *Extern:
 			switch ex, ok := l.extern[x.NameID]; {

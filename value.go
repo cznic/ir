@@ -10,6 +10,7 @@ import (
 
 var (
 	_ Value = (*AddressValue)(nil)
+	_ Value = (*Float64Value)(nil)
 	_ Value = (*Int32Value)(nil)
 	_ Value = (*StringValue)(nil)
 )
@@ -43,6 +44,14 @@ func (v *AddressValue) String() string {
 		panic("internal error")
 	}
 }
+
+// Float64Value is a declaration initializer constant of type float64.
+type Float64Value struct {
+	valuer
+	Value float64
+}
+
+func (v *Float64Value) String() string { return fmt.Sprint(v.Value) }
 
 // Int32Value is a declaration initializer constant of type int32.
 type Int32Value struct {

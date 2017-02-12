@@ -212,7 +212,7 @@ func (m MemoryModel) StructAlignof(t Type) int {
 	}
 }
 
-// FieldProperties describes a struct/union field.
+// FieldProperties describe a struct/union field.
 type FieldProperties struct {
 	Offset  int64 // Relative to start of the struct/union.
 	Size    int64 // Field size for copying.

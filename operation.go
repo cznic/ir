@@ -14,11 +14,14 @@ const opw = 16
 var (
 	_ Operation = (*Add)(nil)
 	_ Operation = (*AllocResult)(nil)
+	_ Operation = (*And)(nil)
 	_ Operation = (*Argument)(nil)
 	_ Operation = (*Arguments)(nil)
 	_ Operation = (*BeginScope)(nil)
 	_ Operation = (*Bool)(nil)
 	_ Operation = (*Call)(nil)
+	_ Operation = (*Convert)(nil)
+	_ Operation = (*Div)(nil)
 	_ Operation = (*Drop)(nil)
 	_ Operation = (*Dup)(nil)
 	_ Operation = (*Element)(nil)
@@ -26,6 +29,8 @@ var (
 	_ Operation = (*Eq)(nil)
 	_ Operation = (*Extern)(nil)
 	_ Operation = (*Field)(nil)
+	_ Operation = (*Float64Const)(nil)
+	_ Operation = (*Geq)(nil)
 	_ Operation = (*Int32Const)(nil)
 	_ Operation = (*Jmp)(nil)
 	_ Operation = (*Jnz)(nil)
@@ -35,6 +40,9 @@ var (
 	_ Operation = (*Load)(nil)
 	_ Operation = (*Lt)(nil)
 	_ Operation = (*Mul)(nil)
+	_ Operation = (*Neq)(nil)
+	_ Operation = (*Nil)(nil)
+	_ Operation = (*Or)(nil)
 	_ Operation = (*Panic)(nil)
 	_ Operation = (*PostIncrement)(nil)
 	_ Operation = (*Result)(nil)
@@ -44,6 +52,7 @@ var (
 	_ Operation = (*Sub)(nil)
 	_ Operation = (*Variable)(nil)
 	_ Operation = (*VariableDeclaration)(nil)
+	_ Operation = (*Xor)(nil)
 )
 
 // Operation is a unit of execution.
@@ -52,7 +61,7 @@ type Operation interface {
 	verify(*verifier) error
 }
 
-// Add operation subtracts the top stack item (b) and the previous one (a) and
+// Add operation adds the top stack item (b) and the previous one (a) and
 // replaces both operands with a - b.
 type Add struct {
 	TypeID // Operands type.
@@ -96,6 +105,27 @@ func (o *AllocResult) verify(v *verifier) error {
 
 func (o *AllocResult) String() string {
 	return fmt.Sprintf("\t%-*s\t%v\t; %s %s", opw, "allocResult", o.TypeID, o.TypeName, o.Position)
+}
+
+// And operation replaces TOS with the bitwise or of the top two stack items.
+type And struct {
+	TypeID // Operands type.
+	token.Position
+}
+
+// Pos implements Operation.
+func (o *And) Pos() token.Position { return o.Position }
+
+func (o *And) verify(v *verifier) error {
+	if o.TypeID == 0 {
+		return fmt.Errorf("missing type")
+	}
+
+	return v.binop()
+}
+
+func (o *And) String() string {
+	return fmt.Sprintf("\t%-*s\t%s\t; %s", opw, "and", o.TypeID, o.Position)
 }
 
 // Argument pushes argument Index, or its address, to the evaluation stack.
@@ -296,6 +326,60 @@ func (o *Call) String() string {
 	return fmt.Sprintf("\t%-*s\t%v, %s\t; %s", opw, "call", o.Arguments, o.TypeID, o.Position)
 }
 
+// Convert operation converts TOS to the result type.
+type Convert struct {
+	Result TypeID // Conversion type.
+	TypeID        // Operand type.
+	token.Position
+}
+
+// Pos implements Operation.
+func (o *Convert) Pos() token.Position { return o.Position }
+
+func (o *Convert) verify(v *verifier) error {
+	if o.TypeID == 0 || o.Result == 0 {
+		return fmt.Errorf("missing type")
+	}
+
+	n := len(v.stack)
+	if n == 0 {
+		return fmt.Errorf("evaluation stack underflow")
+	}
+
+	if g, e := v.stack[n-1], o.TypeID; g != e {
+		return fmt.Errorf("mismatched types, got %s, expected %s", g, e)
+	}
+
+	v.stack[n-1] = o.Result
+	return nil
+}
+
+func (o *Convert) String() string {
+	return fmt.Sprintf("\t%-*s\t%s, %s\t; %s", opw, "convert", o.TypeID, o.Result, o.Position)
+}
+
+// Div operation subtracts the top stack item (b) and the previous one (a) and
+// replaces both operands with a - b.
+type Div struct {
+	TypeID // Operands type.
+	token.Position
+}
+
+// Pos implements Operation.
+func (o *Div) Pos() token.Position { return o.Position }
+
+func (o *Div) verify(v *verifier) error {
+	if o.TypeID == 0 {
+		return fmt.Errorf("missing type")
+	}
+
+	return v.binop()
+}
+
+func (o *Div) String() string {
+	return fmt.Sprintf("\t%-*s\t%s\t; %s", opw, "div", o.TypeID, o.Position)
+}
+
 // Drop operation removes one item from the evaluation stack.
 type Drop struct {
 	TypeID
@@ -463,7 +547,7 @@ func (o *Eq) String() string {
 // Extern operation pushes an external definition on the evaluation stack.
 type Extern struct {
 	Address bool
-	Index   int // A negative value or object index as resolved by the linker.
+	Index   int // A negative value or an object index as resolved by the linker.
 	NameID
 	TypeID
 	TypeName NameID
@@ -552,6 +636,47 @@ func (o *Field) String() string {
 	default:
 		return fmt.Sprintf("\t%-*s\t%v, %v\t; %s", opw, "field", o.Index, o.TypeID, o.Position)
 	}
+}
+
+// Float64Const operation pushes a float64 literal on the evaluation stack.
+type Float64Const struct {
+	Value float64
+	token.Position
+}
+
+// Pos implements Operation.
+func (o *Float64Const) Pos() token.Position { return o.Position }
+
+func (o *Float64Const) verify(v *verifier) error {
+	v.stack = append(v.stack, TypeID(idFloat64))
+	return nil
+}
+
+func (o *Float64Const) String() string {
+	return fmt.Sprintf("\t%-*s\t%v, float64\t; %s", opw, "const", o.Value, o.Position)
+}
+
+// Geq operation compares the top stack item (b) and the previous one (a) and
+// replaces both operands with a non zero int32 value if a >= b or zero
+// otherwise.
+type Geq struct {
+	TypeID // Operands type.
+	token.Position
+}
+
+// Pos implements Operation.
+func (o *Geq) Pos() token.Position { return o.Position }
+
+func (o *Geq) verify(v *verifier) error {
+	if o.TypeID == 0 {
+		return fmt.Errorf("missing type")
+	}
+
+	return v.relop()
+}
+
+func (o *Geq) String() string {
+	return fmt.Sprintf("\t%-*s\t%s\t; %s", opw, "geq", o.TypeID, o.Position)
 }
 
 // Int32Const operation pushes an int32 literal on the evaluation stack.
@@ -775,6 +900,72 @@ func (o *Mul) String() string {
 	return fmt.Sprintf("\t%-*s\t%s\t; %s", opw, "mul", o.TypeID, o.Position)
 }
 
+// Neq operation compares the top stack item (b) and the previous one (a) and
+// replaces both operands with a non zero int32 value if a != b or zero
+// otherwise.
+type Neq struct {
+	TypeID // Operands type.
+	token.Position
+}
+
+// Pos implements Operation.
+func (o *Neq) Pos() token.Position { return o.Position }
+
+func (o *Neq) verify(v *verifier) error {
+	if o.TypeID == 0 {
+		return fmt.Errorf("missing type")
+	}
+
+	return v.relop()
+}
+
+func (o *Neq) String() string {
+	return fmt.Sprintf("\t%-*s\t%s\t; %s", opw, "neq", o.TypeID, o.Position)
+}
+
+// Nil pushes a typed nil to TOS.
+type Nil struct {
+	TypeID // Pointer type.
+	token.Position
+}
+
+// Pos implements Operation.
+func (o *Nil) Pos() token.Position { return o.Position }
+
+func (o *Nil) verify(v *verifier) error {
+	if o.TypeID == 0 {
+		return fmt.Errorf("missing type")
+	}
+
+	v.stack = append(v.stack, o.TypeID)
+	return nil
+}
+
+func (o *Nil) String() string {
+	return fmt.Sprintf("\t%-*s\t%s\t; %s", opw, "nil", o.TypeID, o.Position)
+}
+
+// Or operation replaces TOS with the bitwise or of the top two stack items.
+type Or struct {
+	TypeID // Operands type.
+	token.Position
+}
+
+// Pos implements Operation.
+func (o *Or) Pos() token.Position { return o.Position }
+
+func (o *Or) verify(v *verifier) error {
+	if o.TypeID == 0 {
+		return fmt.Errorf("missing type")
+	}
+
+	return v.binop()
+}
+
+func (o *Or) String() string {
+	return fmt.Sprintf("\t%-*s\t%s\t; %s", opw, "or", o.TypeID, o.Position)
+}
+
 // Panic operation aborts execution with a stack trace.
 type Panic struct {
 	token.Position
@@ -895,7 +1086,7 @@ func (o *Return) String() string {
 // Store operation stores a TOS value at address in the preceding stack
 // position.  The address is removed from the evaluation stack.
 type Store struct {
-	TypeID
+	TypeID // Type of the value.
 	token.Position
 }
 
@@ -1048,4 +1239,25 @@ func (o *VariableDeclaration) String() string {
 		s = fmt.Sprintf("%v", o.TypeID)
 	}
 	return fmt.Sprintf("\t%-*s\t%v, %s, %s\t; %s %s", opw, "varDecl", o.Index, o.NameID, s, o.TypeName, o.Position)
+}
+
+// Xor operation replaces TOS with the bitwise xor of the top two stack items.
+type Xor struct {
+	TypeID // Operands type.
+	token.Position
+}
+
+// Pos implements Operation.
+func (o *Xor) Pos() token.Position { return o.Position }
+
+func (o *Xor) verify(v *verifier) error {
+	if o.TypeID == 0 {
+		return fmt.Errorf("missing type")
+	}
+
+	return v.binop()
+}
+
+func (o *Xor) String() string {
+	return fmt.Sprintf("\t%-*s\t%s\t; %s", opw, "xor", o.TypeID, o.Position)
 }
