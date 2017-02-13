@@ -30,6 +30,7 @@ var (
 	idInt8    = dict.SID("int8")
 	idInt8Ptr = dict.SID("*int8")
 	idStart   = dict.SID("_start")
+	idVoidPtr = dict.SID("*struct{}")
 
 	printHooks = strutil.PrettyPrintHooks{
 		reflect.TypeOf(NameID(0)): func(f strutil.Formatter, v interface{}, prefix, suffix string) {

@@ -20,6 +20,8 @@ var (
 	_ Operation = (*BeginScope)(nil)
 	_ Operation = (*Bool)(nil)
 	_ Operation = (*Call)(nil)
+	_ Operation = (*Const32)(nil)
+	_ Operation = (*Const64)(nil)
 	_ Operation = (*Convert)(nil)
 	_ Operation = (*Div)(nil)
 	_ Operation = (*Drop)(nil)
@@ -27,11 +29,10 @@ var (
 	_ Operation = (*Element)(nil)
 	_ Operation = (*EndScope)(nil)
 	_ Operation = (*Eq)(nil)
-	_ Operation = (*Extern)(nil)
 	_ Operation = (*Field)(nil)
-	_ Operation = (*Float64Const)(nil)
 	_ Operation = (*Geq)(nil)
-	_ Operation = (*Int32Const)(nil)
+	_ Operation = (*Global)(nil)
+	_ Operation = (*Gt)(nil)
 	_ Operation = (*Jmp)(nil)
 	_ Operation = (*Jnz)(nil)
 	_ Operation = (*Jz)(nil)
@@ -45,6 +46,7 @@ var (
 	_ Operation = (*Or)(nil)
 	_ Operation = (*Panic)(nil)
 	_ Operation = (*PostIncrement)(nil)
+	_ Operation = (*Rem)(nil)
 	_ Operation = (*Result)(nil)
 	_ Operation = (*Return)(nil)
 	_ Operation = (*Store)(nil)
@@ -313,8 +315,12 @@ func (o *Call) verify(v *verifier) error {
 			break
 		}
 
-		if g, e := args[i].ID(), v; g != e {
-			return fmt.Errorf("invalid argument #%v type, expected %s", i, e)
+		if g, e := v, args[i].ID(); g != e {
+			if e == TypeID(idVoidPtr) && args[i].Kind() == Pointer {
+				continue
+			}
+
+			return fmt.Errorf("invalid argument #%v type, got %v, expected %s", i, g, e)
 		}
 	}
 
@@ -324,6 +330,52 @@ func (o *Call) verify(v *verifier) error {
 
 func (o *Call) String() string {
 	return fmt.Sprintf("\t%-*s\t%v, %s\t; %s", opw, "call", o.Arguments, o.TypeID, o.Position)
+}
+
+// Const32 operation pushes an 32 bit literal on the evaluation stack.
+type Const32 struct {
+	TypeID
+	Value int32
+	token.Position
+}
+
+// Pos implements Operation.
+func (o *Const32) Pos() token.Position { return o.Position }
+
+func (o *Const32) verify(v *verifier) error {
+	if o.TypeID == 0 {
+		return fmt.Errorf("missing type")
+	}
+
+	v.stack = append(v.stack, o.TypeID)
+	return nil
+}
+
+func (o *Const32) String() string {
+	return fmt.Sprintf("\t%-*s\t%#x, %v\t; %s", opw, "const", o.Value, o.TypeID, o.Position)
+}
+
+// Const64 operation pushes an 64 bit literal on the evaluation stack.
+type Const64 struct {
+	TypeID
+	Value int64
+	token.Position
+}
+
+// Pos implements Operation.
+func (o *Const64) Pos() token.Position { return o.Position }
+
+func (o *Const64) verify(v *verifier) error {
+	if o.TypeID == 0 {
+		return fmt.Errorf("missing type")
+	}
+
+	v.stack = append(v.stack, o.TypeID)
+	return nil
+}
+
+func (o *Const64) String() string {
+	return fmt.Sprintf("\t%-*s\t%#x, %v\t; %s", opw, "const", o.Value, o.TypeID, o.Position)
 }
 
 // Convert operation converts TOS to the result type.
@@ -544,42 +596,6 @@ func (o *Eq) String() string {
 	return fmt.Sprintf("\t%-*s\t%s\t; %s", opw, "eq", o.TypeID, o.Position)
 }
 
-// Extern operation pushes an external definition on the evaluation stack.
-type Extern struct {
-	Address bool
-	Index   int // A negative value or an object index as resolved by the linker.
-	NameID
-	TypeID
-	TypeName NameID
-	token.Position
-}
-
-// Pos implements Operation.
-func (o *Extern) Pos() token.Position { return o.Position }
-
-func (o *Extern) verify(v *verifier) error {
-	if o.TypeID == 0 {
-		return fmt.Errorf("missing type")
-	}
-
-	//TODO add context to v so that on .Index >= 0 the linker result can be verified.
-	t := v.typeCache.MustType(o.TypeID)
-	if o.Address && t.Kind() != Pointer {
-		return fmt.Errorf("expected pointer type, have %s", o.TypeID)
-	}
-
-	v.stack = append(v.stack, o.TypeID)
-	return nil
-}
-
-func (o *Extern) String() string {
-	s := ""
-	if o.Index >= 0 {
-		s = fmt.Sprintf("%v, ", o.Index)
-	}
-	return fmt.Sprintf("extern\t%-*s\t%s\t; %s %s", opw, s+addr(o.Address)+o.NameID.String(), o.TypeID, o.TypeName, o.Position)
-}
-
 // Field replaces a struct/union pointer at TOS with its field by index, or its
 // address.
 type Field struct {
@@ -638,24 +654,6 @@ func (o *Field) String() string {
 	}
 }
 
-// Float64Const operation pushes a float64 literal on the evaluation stack.
-type Float64Const struct {
-	Value float64
-	token.Position
-}
-
-// Pos implements Operation.
-func (o *Float64Const) Pos() token.Position { return o.Position }
-
-func (o *Float64Const) verify(v *verifier) error {
-	v.stack = append(v.stack, TypeID(idFloat64))
-	return nil
-}
-
-func (o *Float64Const) String() string {
-	return fmt.Sprintf("\t%-*s\t%v, float64\t; %s", opw, "const", o.Value, o.Position)
-}
-
 // Geq operation compares the top stack item (b) and the previous one (a) and
 // replaces both operands with a non zero int32 value if a >= b or zero
 // otherwise.
@@ -679,22 +677,73 @@ func (o *Geq) String() string {
 	return fmt.Sprintf("\t%-*s\t%s\t; %s", opw, "geq", o.TypeID, o.Position)
 }
 
-// Int32Const operation pushes an int32 literal on the evaluation stack.
-type Int32Const struct {
-	Value int32
+// Global operation pushes an external definition on the evaluation stack.
+type Global struct {
+	Address bool
+	Index   int // A negative value or an object index as resolved by the linker.
+	Linkage
+	NameID
+	TypeID
+	TypeName NameID
 	token.Position
 }
 
 // Pos implements Operation.
-func (o *Int32Const) Pos() token.Position { return o.Position }
+func (o *Global) Pos() token.Position { return o.Position }
 
-func (o *Int32Const) verify(v *verifier) error {
-	v.stack = append(v.stack, TypeID(idInt32))
+func (o *Global) verify(v *verifier) error {
+	if o.TypeID == 0 {
+		return fmt.Errorf("missing type")
+	}
+
+	if o.Linkage != ExternalLinkage && o.Linkage != InternalLinkage {
+		return fmt.Errorf("invalid linkage")
+	}
+
+	//TODO add context to v so that on .Index >= 0 the linker result can be verified.
+	t := v.typeCache.MustType(o.TypeID)
+	if o.Address && t.Kind() != Pointer {
+		return fmt.Errorf("expected pointer type, have %s", o.TypeID)
+	}
+
+	v.stack = append(v.stack, o.TypeID)
 	return nil
 }
 
-func (o *Int32Const) String() string {
-	return fmt.Sprintf("\t%-*s\t%v, int32\t; %s", opw, "const", o.Value, o.Position)
+func (o *Global) String() string {
+	s := ""
+	if o.Index >= 0 {
+		s = fmt.Sprintf("%v, ", o.Index)
+	}
+	switch o.Linkage {
+	case ExternalLinkage:
+		return fmt.Sprintf("global\t%-*s\t%s\t; %s %s", opw, s+addr(o.Address)+o.NameID.String(), o.TypeID, o.TypeName, o.Position)
+	default:
+		return fmt.Sprintf("static\t%-*s\t%s\t; %s %s", opw, s+addr(o.Address)+o.NameID.String(), o.TypeID, o.TypeName, o.Position)
+	}
+}
+
+// Gt operation compares the top stack item (b) and the previous one (a) and
+// replaces both operands with a non zero int32 value if a > b or zero
+// otherwise.
+type Gt struct {
+	TypeID // Operands type.
+	token.Position
+}
+
+// Pos implements Operation.
+func (o *Gt) Pos() token.Position { return o.Position }
+
+func (o *Gt) verify(v *verifier) error {
+	if o.TypeID == 0 {
+		return fmt.Errorf("missing type")
+	}
+
+	return v.relop()
+}
+
+func (o *Gt) String() string {
+	return fmt.Sprintf("\t%-*s\t%s\t; %s", opw, "gt", o.TypeID, o.Position)
 }
 
 // Jmp operation performs a branch to a named or numbered label.
@@ -773,18 +822,7 @@ type Label struct {
 // Pos implements Operation.
 func (o *Label) Pos() token.Position { return o.Position }
 
-func (o *Label) verify(v *verifier) error {
-	n := int(o.NameID)
-	if n == 0 {
-		n = o.Number
-	}
-	if _, ok := v.labels[n]; ok {
-		return fmt.Errorf("label redefined")
-	}
-
-	v.labels[n] = struct{}{}
-	return nil
-}
+func (o *Label) verify(v *verifier) error { return nil }
 
 func (o *Label) String() string {
 	switch {
@@ -1024,6 +1062,28 @@ func (o *PostIncrement) String() string {
 	return fmt.Sprintf("\t%-*s\t%v\t; %s", opw, o.TypeID.String()+"++", o.Delta, o.Position)
 }
 
+// Rem operation adds the top stack item (b) and the previous one (a) and
+// replaces both operands with a % b.
+type Rem struct {
+	TypeID // Operands type.
+	token.Position
+}
+
+// Pos implements Operation.
+func (o *Rem) Pos() token.Position { return o.Position }
+
+func (o *Rem) verify(v *verifier) error {
+	if o.TypeID == 0 {
+		return fmt.Errorf("missing type")
+	}
+
+	return v.binop()
+}
+
+func (o *Rem) String() string {
+	return fmt.Sprintf("\t%-*s\t%s\t; %s", opw, "rem", o.TypeID, o.Position)
+}
+
 // Result pushes a function result by index, or its address, to the evaluation
 // stack.
 type Result struct {
@@ -1106,7 +1166,7 @@ func (o *Store) verify(v *verifier) error {
 	tid := v.stack[p]
 	pt := v.typeCache.MustType(tid)
 	if pt.Kind() != Pointer {
-		return fmt.Errorf("expected pointer and value at TOS, got %s and %s", tid, v.stack[p+1])
+		return fmt.Errorf("expected pointer and value at TOS, got %s and %s (%v)", tid, v.stack[p+1], v.stack)
 	}
 
 	if g, e := pt.(*PointerType).Element.ID(), v.stack[p+1]; g != e {

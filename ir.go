@@ -11,6 +11,8 @@ package ir
 import (
 	"fmt"
 	"go/token"
+
+	"github.com/cznic/internal/buffer"
 )
 
 var (
@@ -136,81 +138,122 @@ func (f *FunctionDefinition) Verify() (err error) {
 
 	vv := &verifier{
 		function:  f,
-		labels:    map[int]struct{}{},
+		labels:    map[int]int{},
 		typeCache: TypeCache{},
 	}
 	var v Operation
-	ignore := false
 	for vv.ip, v = range f.Body {
-		vv.stack = append([]TypeID(nil), vv.stack...)
-		if !ignore {
-			if err = v.verify(vv); err != nil {
-				return fmt.Errorf("%v\n%s:%#x: %v", err, f.NameID, vv.ip, v)
-			}
-		}
-		switch v.(type) {
-		case *Panic:
-			ignore = true
-		case *Label:
-			if ignore {
-				if err = v.verify(vv); err != nil {
-					return fmt.Errorf("%v\n%s:%#x: %v", err, f.NameID, vv.ip, v)
-				}
-			}
-			ignore = false
+		switch x := v.(type) {
 		case *BeginScope:
-			if ignore {
-				vv.blockLevel++
-			}
+			vv.blockLevel++
 		case *EndScope:
-			if ignore {
-				vv.blockLevel--
+			vv.blockLevel--
+		case *Label:
+			n := int(x.NameID)
+			if n == 0 {
+				n = x.Number
 			}
+			if _, ok := vv.labels[n]; ok {
+				return fmt.Errorf("label redefined\n%s:%#x: %v", f.NameID, vv.ip, v)
+			}
+
+			vv.labels[n] = vv.ip
 		}
 	}
+
 	if vv.blockLevel != 0 {
 		return fmt.Errorf("unbalanced BeginScope/EndScope")
 	}
 
 	for ip, v := range f.Body {
+		var nm NameID
+		var num int
 		switch x := v.(type) {
 		case *Jmp:
-			n := int(x.NameID)
-			if n == 0 {
-				n = x.Number
-			}
-
-			if _, ok := vv.labels[n]; !ok {
-				return fmt.Errorf("undefined branch target\n%s:%#x: %v", f.NameID, ip, v)
-			}
+			nm, num = x.NameID, x.Number
 		case *Jnz:
-			n := int(x.NameID)
-			if n == 0 {
-				n = x.Number
-			}
-
-			if _, ok := vv.labels[n]; !ok {
-				return fmt.Errorf("undefined branch target\n%s:%#x: %v", f.NameID, ip, v)
-			}
+			nm, num = x.NameID, x.Number
 		case *Jz:
-			n := int(x.NameID)
-			if n == 0 {
-				n = x.Number
+			nm, num = x.NameID, x.Number
+		default:
+			continue
+		}
+
+		n := int(nm)
+		if n == 0 {
+			n = num
+		}
+		if _, ok := vv.labels[n]; !ok {
+			return fmt.Errorf("undefined branch target\n%s:%#x: %v", f.NameID, ip, v)
+		}
+	}
+
+	return nil //TODO-
+	p := buffer.CGet(len(f.Body))
+	visited := *p
+
+	defer buffer.Put(p)
+
+	phi := map[int][]TypeID{}
+	var g func(int, []TypeID) error
+	g = func(ip int, stack []TypeID) error {
+		for ; ; ip++ {
+			if visited[ip] != 0 {
+				switch ex, ok := phi[ip]; {
+				case ok:
+					if g, e := len(stack), len(ex); g != e {
+						return fmt.Errorf("eval stack depth differs\n%s:%#x: %v", f.NameID, ip, v)
+					}
+				default:
+					phi[ip] = append([]TypeID(nil), stack...)
+				}
+				return nil
 			}
 
-			if _, ok := vv.labels[n]; !ok {
-				return fmt.Errorf("undefined branch target\n%s:%#x: %v", f.NameID, ip, v)
+			visited[ip] = 1
+
+			vv.ip = ip
+			if err := f.Body[ip].verify(vv); err != nil {
+				return fmt.Errorf("%s\n%s:%#x: %v", err, f.NameID, ip, v)
+			}
+
+			switch x := f.Body[ip].(type) {
+			case *Jmp:
+				n := int(x.NameID)
+				if n == 0 {
+					n = x.Number
+				}
+				ip = vv.labels[n]
+				continue
+			case *Jnz:
+				n := int(x.NameID)
+				if n == 0 {
+					n = x.Number
+				}
+				if err := g(vv.labels[n], append([]TypeID(nil), stack...)); err != nil {
+					return err
+				}
+			case *Jz:
+				n := int(x.NameID)
+				if n == 0 {
+					n = x.Number
+				}
+				if err := g(vv.labels[n], append([]TypeID(nil), stack...)); err != nil {
+					return err
+				}
+			case *Return, *Panic:
+				return nil
 			}
 		}
 	}
-	return nil
+	return g(0, nil)
 }
 
 type verifier struct {
 	blockLevel int
 	function   *FunctionDefinition
 	ip         int
-	labels     map[int]struct{}
+	labels     map[int]int
 	stack      []TypeID
 	typeCache  TypeCache
 	variables  []TypeID

@@ -148,7 +148,10 @@ func (l *linker) defineFunc(e extern, f *FunctionDefinition) (r int) {
 			*Argument,
 			*Arguments,
 			*BeginScope,
+			*Bool,
 			*Call,
+			*Const32,
+			*Const64,
 			*Convert,
 			*Div,
 			*Drop,
@@ -157,8 +160,8 @@ func (l *linker) defineFunc(e extern, f *FunctionDefinition) (r int) {
 			*EndScope,
 			*Eq,
 			*Field,
-			*Float64Const,
-			*Int32Const,
+			*Geq,
+			*Gt,
 			*Jmp,
 			*Jnz,
 			*Jz,
@@ -172,6 +175,7 @@ func (l *linker) defineFunc(e extern, f *FunctionDefinition) (r int) {
 			*Or,
 			*Panic,
 			*PostIncrement,
+			*Rem,
 			*Result,
 			*Return,
 			*Store,
@@ -180,12 +184,24 @@ func (l *linker) defineFunc(e extern, f *FunctionDefinition) (r int) {
 			*Variable,
 			*Xor:
 			// nop
-		case *Extern:
-			switch ex, ok := l.extern[x.NameID]; {
-			case ok:
-				x.Index = l.define(ex)
+		case *Global:
+			switch x.Linkage {
+			case ExternalLinkage:
+				switch ex, ok := l.extern[x.NameID]; {
+				case ok:
+					x.Index = l.define(ex)
+				default:
+					panic("TODO")
+				}
+			case InternalLinkage:
+				switch ex, ok := l.intern[intern{x.NameID, e.unit}]; {
+				case ok:
+					x.Index = l.define(extern{e.unit, ex})
+				default:
+					panic("TODO")
+				}
 			default:
-				panic("TODO")
+				panic("internal error")
 			}
 		case *VariableDeclaration:
 			l.initializer(x)
