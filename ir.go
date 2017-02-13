@@ -147,7 +147,17 @@ func (f *FunctionDefinition) Verify() (err error) {
 		case *BeginScope:
 			vv.blockLevel++
 		case *EndScope:
+			if vv.blockLevel == 0 {
+				return fmt.Errorf("unbalanced end scope\n%s:%#x: %v", f.NameID, vv.ip, v)
+			}
+
 			vv.blockLevel--
+			if vv.blockLevel == 0 {
+				if _, ok := f.Body[vv.ip-1].(*Return); !ok {
+					return fmt.Errorf("missing return before end of function\n%s:%#x: %v", f.NameID, vv.ip, v)
+				}
+			}
+
 		case *Label:
 			n := int(x.NameID)
 			if n == 0 {
@@ -188,7 +198,6 @@ func (f *FunctionDefinition) Verify() (err error) {
 		}
 	}
 
-	return nil //TODO-
 	p := buffer.CGet(len(f.Body))
 	visited := *p
 
@@ -197,26 +206,36 @@ func (f *FunctionDefinition) Verify() (err error) {
 	phi := map[int][]TypeID{}
 	var g func(int, []TypeID) error
 	g = func(ip int, stack []TypeID) error {
-		for ; ; ip++ {
+		for {
+			//fmt.Printf("# %#05x %v ; %v\n", ip, stack, f.Body[ip].Pos())
 			if visited[ip] != 0 {
 				switch ex, ok := phi[ip]; {
 				case ok:
 					if g, e := len(stack), len(ex); g != e {
-						return fmt.Errorf("eval stack depth differs\n%s:%#x: %v", f.NameID, ip, v)
+						return fmt.Errorf("evaluation stacks depth differs %v %v\n%s:%#x: %v", stack, ex, f.NameID, ip, v)
 					}
+
+					for i, v := range stack {
+						if g, e := v, ex[i]; g != e {
+							return fmt.Errorf("evaluation stacks differ %v %v\n%s:%#x: %v", stack, ex, f.NameID, ip, v)
+						}
+					}
+
+					return nil
 				default:
-					phi[ip] = append([]TypeID(nil), stack...)
+					panic("internal error")
 				}
-				return nil
 			}
 
 			visited[ip] = 1
 
 			vv.ip = ip
+			vv.stack = stack
 			if err := f.Body[ip].verify(vv); err != nil {
 				return fmt.Errorf("%s\n%s:%#x: %v", err, f.NameID, ip, v)
 			}
 
+			stack = vv.stack
 			switch x := f.Body[ip].(type) {
 			case *Jmp:
 				n := int(x.NameID)
@@ -241,9 +260,12 @@ func (f *FunctionDefinition) Verify() (err error) {
 				if err := g(vv.labels[n], append([]TypeID(nil), stack...)); err != nil {
 					return err
 				}
+			case *Label:
+				phi[ip] = append([]TypeID(nil), stack...)
 			case *Return, *Panic:
 				return nil
 			}
+			ip++
 		}
 	}
 	return g(0, nil)

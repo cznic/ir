@@ -225,7 +225,6 @@ func (o *BeginScope) verify(v *verifier) error {
 		return fmt.Errorf("non empty evaluation stack at scope begin")
 	}
 
-	v.blockLevel++
 	return nil
 }
 
@@ -553,17 +552,6 @@ func (o *EndScope) Pos() token.Position { return o.Position }
 func (o *EndScope) verify(v *verifier) error {
 	if len(v.stack) != 0 {
 		return fmt.Errorf("non empty evaluation stack at scope end")
-	}
-
-	if v.blockLevel == 0 {
-		return fmt.Errorf("unbalanced end scope")
-	}
-
-	v.blockLevel--
-	if v.blockLevel == 0 {
-		if _, ok := v.function.Body[v.ip-1].(*Return); !ok {
-			return fmt.Errorf("missing return before end of function")
-		}
 	}
 
 	return nil
