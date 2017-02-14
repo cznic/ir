@@ -208,6 +208,7 @@ func (f *FunctionDefinition) Verify() (err error) {
 	g = func(ip int, stack []TypeID) error {
 		for {
 			//fmt.Printf("# %#05x %v ; %v\n", ip, stack, f.Body[ip].Pos())
+			v := f.Body[ip]
 			if visited[ip] != 0 {
 				switch ex, ok := phi[ip]; {
 				case ok:
@@ -293,6 +294,37 @@ func (v *verifier) binop() error {
 	}
 
 	v.stack = append(v.stack[:len(v.stack)-2], a)
+	return nil
+}
+
+func (v *verifier) unop() error {
+	n := len(v.stack)
+	if n == 0 {
+		return fmt.Errorf("evaluation stack underflow")
+	}
+
+	a := v.stack[n-1]
+	switch v.typeCache.MustType(a).Kind() {
+	case
+		Int8,
+		Int16,
+		Int32,
+		Int64,
+
+		Uint8,
+		Uint16,
+		Uint32,
+		Uint64,
+
+		Float32,
+		Float64,
+		Float128:
+
+		// ok
+	default:
+		return fmt.Errorf("invalid operand type: %s ", a)
+	}
+
 	return nil
 }
 

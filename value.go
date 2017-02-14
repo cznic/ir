@@ -6,10 +6,13 @@ package ir
 
 import (
 	"fmt"
+
+	"github.com/cznic/internal/buffer"
 )
 
 var (
 	_ Value = (*AddressValue)(nil)
+	_ Value = (*CompositeValue)(nil)
 	_ Value = (*Float64Value)(nil)
 	_ Value = (*Int32Value)(nil)
 	_ Value = (*StringValue)(nil)
@@ -43,6 +46,25 @@ func (v *AddressValue) String() string {
 	default:
 		panic("internal error")
 	}
+}
+
+// CompositeValue represents a constant array/struct initializer.
+type CompositeValue struct {
+	valuer
+	Values []Value
+}
+
+func (v *CompositeValue) String() string {
+	var b buffer.Bytes
+	b.WriteByte('{')
+	for i, v := range v.Values {
+		if i != 0 {
+			fmt.Fprintf(&b, ", ")
+		}
+		fmt.Fprint(&b, v)
+	}
+	b.WriteByte('}')
+	return string(b.Bytes())
 }
 
 // Float64Value is a declaration initializer constant of type float64.

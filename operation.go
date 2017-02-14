@@ -23,6 +23,7 @@ var (
 	_ Operation = (*Const32)(nil)
 	_ Operation = (*Const64)(nil)
 	_ Operation = (*Convert)(nil)
+	_ Operation = (*Copy)(nil)
 	_ Operation = (*Div)(nil)
 	_ Operation = (*Drop)(nil)
 	_ Operation = (*Dup)(nil)
@@ -41,6 +42,7 @@ var (
 	_ Operation = (*Load)(nil)
 	_ Operation = (*Lt)(nil)
 	_ Operation = (*Mul)(nil)
+	_ Operation = (*Neg)(nil)
 	_ Operation = (*Neq)(nil)
 	_ Operation = (*Nil)(nil)
 	_ Operation = (*Or)(nil)
@@ -409,6 +411,47 @@ func (o *Convert) String() string {
 	return fmt.Sprintf("\t%-*s\t%s, %s\t; %s", opw, "convert", o.TypeID, o.Result, o.Position)
 }
 
+// Copy assigns source, which address is at TOS, to dest, which address is the
+// previous stack item. The source address is removed from the stack.
+type Copy struct {
+	TypeID // Operand type.
+	token.Position
+}
+
+// Pos implements Operation.
+func (o *Copy) Pos() token.Position { return o.Position }
+
+func (o *Copy) verify(v *verifier) error {
+	if o.TypeID == 0 {
+		return fmt.Errorf("missing type")
+	}
+
+	n := len(v.stack)
+	if n < 2 {
+		return fmt.Errorf("evaluation stack underflow")
+	}
+
+	t := v.typeCache.MustType(o.TypeID)
+	if t.Kind() == Array {
+		t = t.(*ArrayType).Item
+	}
+	t = t.Pointer()
+	if g, e := v.stack[n-2], t.ID(); g != e && g != TypeID(idVoidPtr) {
+		return fmt.Errorf("mismatched destination type, got %s, expected %s", g, e)
+	}
+
+	if g, e := v.stack[n-1], t.ID(); g != e && g != TypeID(idVoidPtr) {
+		return fmt.Errorf("mismatched source ype, got %s, expected %s", g, e)
+	}
+
+	v.stack = v.stack[:n-1]
+	return nil
+}
+
+func (o *Copy) String() string {
+	return fmt.Sprintf("\t%-*s\t%s\t; %s", opw, "copy", o.TypeID, o.Position)
+}
+
 // Div operation subtracts the top stack item (b) and the previous one (a) and
 // replaces both operands with a - b.
 type Div struct {
@@ -445,10 +488,19 @@ func (o *Drop) verify(v *verifier) error {
 		return fmt.Errorf("missing type")
 	}
 
-	if len(v.stack) == 0 {
+	n := len(v.stack)
+	if n == 0 {
 		return fmt.Errorf("evaluation stack underflow")
 	}
 
+	t := v.typeCache.MustType(o.TypeID)
+	switch t.Kind() {
+	case Array:
+		t = t.(*ArrayType).Item.Pointer()
+	}
+	if g, e := v.stack[n-1], t.ID(); g != e {
+		return fmt.Errorf("operand type mismatch, got %s, expected %s", g, e)
+	}
 	v.stack = v.stack[:len(v.stack)-1]
 	return nil
 }
@@ -526,6 +578,9 @@ func (o *Element) verify(v *verifier) error {
 
 	t := pt.(*PointerType).Element
 	if o.Address {
+		if t.Kind() == Array {
+			t = t.(*ArrayType).Item
+		}
 		t = t.Pointer()
 	}
 	v.stack = append(v.stack[:n-2], t.ID())
@@ -924,6 +979,27 @@ func (o *Mul) verify(v *verifier) error {
 
 func (o *Mul) String() string {
 	return fmt.Sprintf("\t%-*s\t%s\t; %s", opw, "mul", o.TypeID, o.Position)
+}
+
+// Neg operation replaces TOS with 0-TOS.
+type Neg struct {
+	TypeID // Operand type.
+	token.Position
+}
+
+// Pos implements Operation.
+func (o *Neg) Pos() token.Position { return o.Position }
+
+func (o *Neg) verify(v *verifier) error {
+	if o.TypeID == 0 {
+		return fmt.Errorf("missing type")
+	}
+
+	return v.unop()
+}
+
+func (o *Neg) String() string {
+	return fmt.Sprintf("\t%-*s\t%s\t; %s", opw, "neg", o.TypeID, o.Position)
 }
 
 // Neq operation compares the top stack item (b) and the previous one (a) and

@@ -110,8 +110,8 @@ func (l *linker) collectSymbols() {
 	}
 }
 
-func (l *linker) initializer(op *VariableDeclaration) {
-	switch x := op.Value.(type) {
+func (l *linker) initializer(op *VariableDeclaration, v Value) {
+	switch x := v.(type) {
 	case
 		*Float64Value,
 		*Int32Value,
@@ -129,6 +129,10 @@ func (l *linker) initializer(op *VariableDeclaration) {
 			x.Index = l.define(e)
 		default:
 			panic(fmt.Errorf("internal error %s", x.Linkage))
+		}
+	case *CompositeValue:
+		for _, v := range x.Values {
+			l.initializer(op, v)
 		}
 	default:
 		panic(fmt.Errorf("internal error: %T %v", x, op))
@@ -153,6 +157,7 @@ func (l *linker) defineFunc(e extern, f *FunctionDefinition) (r int) {
 			*Const32,
 			*Const64,
 			*Convert,
+			*Copy,
 			*Div,
 			*Drop,
 			*Dup,
@@ -170,6 +175,7 @@ func (l *linker) defineFunc(e extern, f *FunctionDefinition) (r int) {
 			*Load,
 			*Lt,
 			*Mul,
+			*Neg,
 			*Neq,
 			*Nil,
 			*Or,
@@ -204,7 +210,7 @@ func (l *linker) defineFunc(e extern, f *FunctionDefinition) (r int) {
 				panic("internal error")
 			}
 		case *VariableDeclaration:
-			l.initializer(x)
+			l.initializer(x, x.Value)
 		default:
 			panic(fmt.Errorf("internal error: %T %s %#05x %v", x, f.NameID, ip, x))
 		}
