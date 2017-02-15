@@ -65,6 +65,7 @@ func (t StringID) GobEncode() ([]byte, error) {
 
 // Object represents a declarations or definitions of static data and functions.
 type Object interface {
+	// Verify checks if the object is well-formed.
 	Verify() error
 }
 

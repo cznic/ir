@@ -9,7 +9,7 @@ import (
 )
 
 // LinkMain returns all objects transitively referenced from function _start or
-// an error, if any. Linking mutates the passed objects.
+// an error, if any. Linking may mutate passed objects.
 //
 // LinkMain panics when passed no data.
 //
@@ -46,19 +46,21 @@ type intern struct {
 }
 
 type linker struct {
-	defined map[extern]int    // unit, unit index: out index
-	extern  map[NameID]extern // name: unit, unit index
-	in      [][]Object
-	intern  map[intern]int // name, unit: unit index
-	out     []Object
+	defined   map[extern]int    // unit, unit index: out index
+	extern    map[NameID]extern // name: unit, unit index
+	in        [][]Object
+	intern    map[intern]int // name, unit: unit index
+	out       []Object
+	typeCache TypeCache
 }
 
 func newLinker(in [][]Object) *linker {
 	l := &linker{
-		defined: map[extern]int{},
-		extern:  map[NameID]extern{},
-		in:      in,
-		intern:  map[intern]int{},
+		defined:   map[extern]int{},
+		extern:    map[NameID]extern{},
+		in:        in,
+		intern:    map[intern]int{},
+		typeCache: TypeCache{},
 	}
 
 	l.collectSymbols()
@@ -139,10 +141,68 @@ func (l *linker) initializer(op *VariableDeclaration, v Value) {
 	}
 }
 
+func (l *linker) checkConversions(p *[]Operation) {
+	s := *p
+	w := 0
+	for _, v := range s {
+		switch x := v.(type) {
+		case *Convert:
+			if x.TypeID == x.Result {
+				continue
+			}
+		}
+
+		s[w] = v
+		w++
+	}
+	*p = s[:w]
+}
+
+func (l *linker) checkCalls(p *[]Operation) {
+	s := *p
+	w := 0
+	var static []int
+	for i, v := range s {
+		switch x := v.(type) {
+		case *Arguments:
+			if i != 0 {
+				switch y := s[i-1].(type) {
+				case *Global:
+					switch l.out[y.Index].(type) {
+					case *FunctionDefinition:
+						static = append(static, y.Index)
+						s[w-1] = x
+						continue
+					}
+				}
+			}
+
+			static = append(static, -1)
+		case *Call:
+			panic("TODO")
+		case *CallFP:
+			n := len(static)
+			index := static[n-1]
+			static = static[:n-1]
+			if index < 0 {
+				break
+			}
+
+			t := l.typeCache.MustType(x.TypeID).(*PointerType).Element
+			v = &Call{Arguments: x.Arguments, Index: index, TypeID: t.ID(), Position: x.Position}
+		}
+
+		s[w] = v
+		w++
+	}
+	*p = s[:w]
+}
+
 func (l *linker) defineFunc(e extern, f *FunctionDefinition) (r int) {
 	r = len(l.out)
 	l.defined[e] = r
 	l.out = append(l.out, f)
+	l.checkConversions(&f.Body)
 	for ip, v := range f.Body {
 		switch x := v.(type) {
 		case
@@ -154,6 +214,7 @@ func (l *linker) defineFunc(e extern, f *FunctionDefinition) (r int) {
 			*BeginScope,
 			*Bool,
 			*Call,
+			*CallFP,
 			*Const32,
 			*Const64,
 			*Convert,
@@ -215,6 +276,7 @@ func (l *linker) defineFunc(e extern, f *FunctionDefinition) (r int) {
 			panic(fmt.Errorf("internal error: %T %s %#05x %v", x, f.NameID, ip, x))
 		}
 	}
+	l.checkCalls(&f.Body)
 	return r
 }
 
@@ -226,9 +288,23 @@ func (l *linker) defineData(e extern, d *DataDefinition) (r int) {
 	f = func(v Value) {
 		switch x := v.(type) {
 		case nil:
-			// nop
+		// nop
+		case *AddressValue:
+			switch x.Linkage {
+			case ExternalLinkage:
+				switch ex, ok := l.extern[x.NameID]; {
+				case ok:
+					x.Index = l.define(ex)
+				default:
+					panic("TODO")
+				}
+			case InternalLinkage:
+				panic("TODO")
+			default:
+				panic("internal error")
+			}
 		default:
-			panic(fmt.Errorf("internal error: %T", x))
+			panic(fmt.Errorf("%v.%v: internal error: %T", e.unit, e.index, x))
 		}
 	}
 	f(d.Value)

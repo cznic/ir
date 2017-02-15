@@ -20,6 +20,7 @@ var (
 	_ Operation = (*BeginScope)(nil)
 	_ Operation = (*Bool)(nil)
 	_ Operation = (*Call)(nil)
+	_ Operation = (*CallFP)(nil)
 	_ Operation = (*Const32)(nil)
 	_ Operation = (*Const64)(nil)
 	_ Operation = (*Convert)(nil)
@@ -180,34 +181,7 @@ type Arguments struct {
 func (o *Arguments) Pos() token.Position { return o.Position }
 
 func (o *Arguments) verify(v *verifier) error {
-	if len(v.stack) == 0 {
-		return fmt.Errorf("evaluation stack underflow")
-	}
-
-	tid := v.stack[len(v.stack)-1]
-	t := v.typeCache.MustType(tid)
-	if t.Kind() != Pointer {
-		return fmt.Errorf("expected a function pointer at TOS, got %s", tid)
-	}
-
-	t = t.(*PointerType).Element
-	if t.Kind() != Function {
-		return fmt.Errorf("expected a function pointer at TOS, got %s", t.ID())
-	}
-
-	results := t.(*FunctionType).Results
-	if len(v.stack) < len(results)+1 {
-		return fmt.Errorf("evaluation stack underflow")
-	}
-
-	for i, r := range results {
-		// | #0 | fp |
-		if g, e := v.stack[len(v.stack)-1-len(results)], r.ID(); g != e {
-			return fmt.Errorf("mismatched result #%v, got %s, expected %s", i, g, e)
-		}
-	}
-
-	return nil
+	return nil // Verified in Call/CallFP.
 }
 
 func (o *Arguments) String() string {
@@ -265,12 +239,13 @@ func (o *Bool) String() string {
 	return fmt.Sprintf("\t%-*s\t%s\t; %s", opw, "bool", o.TypeID, o.Position)
 }
 
-// Call operation performs a function call. The evaluation stack contains the
-// space reseved for function results, is any, the function pointer and any
-// function arguments.
+// Call operation performs a static function call. The evaluation stack
+// contains the space reseved for function results, if any, and any function
+// arguments. On return all arguments are removed from the stack.
 type Call struct {
 	Arguments int // Actual number of arguments passed to function.
-	TypeID        // Type of the function pointer.
+	Index     int // A negative value or an function object index as resolved by the linker.
+	TypeID        // Type of the function.
 	token.Position
 }
 
@@ -278,6 +253,72 @@ type Call struct {
 func (o *Call) Pos() token.Position { return o.Position }
 
 func (o *Call) verify(v *verifier) error {
+	if o.TypeID == 0 {
+		return fmt.Errorf("missing type")
+	}
+
+	t := v.typeCache.MustType(o.TypeID)
+	if t.Kind() != Function {
+		return fmt.Errorf("expected function type, got %s", o.TypeID)
+	}
+
+	if len(v.stack) < o.Arguments {
+		return fmt.Errorf("evaluation stack underflow")
+	}
+
+	ap := len(v.stack) - o.Arguments
+	results := t.(*FunctionType).Results
+	if len(v.stack) < len(results)+o.Arguments {
+		return fmt.Errorf("evaluation stack underflow")
+	}
+
+	for i, r := range results {
+		if g, e := v.stack[ap-len(results)+i], r.ID(); g != e {
+			return fmt.Errorf("mismatched result #%v, got %s, expected %s", i, g, e)
+		}
+	}
+
+	args := t.(*FunctionType).Arguments
+	for i, v := range v.stack[ap:] {
+		if i >= len(args) {
+			break
+		}
+
+		if g, e := v, args[i].ID(); g != e {
+			if e == TypeID(idVoidPtr) && args[i].Kind() == Pointer {
+				continue
+			}
+
+			return fmt.Errorf("invalid argument #%v type, got %v, expected %s", i, g, e)
+		}
+	}
+
+	v.stack = v.stack[:ap]
+	return nil
+}
+
+func (o *Call) String() string {
+	s := ""
+	if o.Index >= 0 {
+		s = fmt.Sprintf("[%v], ", o.Index)
+	}
+	return fmt.Sprintf("\t%-*s\t%s%v, %s\t; %s", opw, "call", s, o.Arguments, o.TypeID, o.Position)
+}
+
+// CallFP operation performs a function pointer call. The evaluation stack
+// contains the space reseved for function results, if any, the function
+// pointer and any function arguments. On return all arguments and the function
+// pointer are removed from the stack.
+type CallFP struct {
+	Arguments int // Actual number of arguments passed to function.
+	TypeID        // Type of the function pointer.
+	token.Position
+}
+
+// Pos implements Operation.
+func (o *CallFP) Pos() token.Position { return o.Position }
+
+func (o *CallFP) verify(v *verifier) error {
 	if o.TypeID == 0 {
 		return fmt.Errorf("missing type")
 	}
@@ -305,7 +346,7 @@ func (o *Call) verify(v *verifier) error {
 
 	for i, r := range results {
 		// | #0 | fp |
-		if g, e := v.stack[fp-len(results)], r.ID(); g != e {
+		if g, e := v.stack[fp-len(results)+i], r.ID(); g != e {
 			return fmt.Errorf("mismatched result #%v, got %s, expected %s", i, g, e)
 		}
 	}
@@ -329,8 +370,8 @@ func (o *Call) verify(v *verifier) error {
 	return nil
 }
 
-func (o *Call) String() string {
-	return fmt.Sprintf("\t%-*s\t%v, %s\t; %s", opw, "call", o.Arguments, o.TypeID, o.Position)
+func (o *CallFP) String() string {
+	return fmt.Sprintf("\t%-*s\t%v, %s\t; %s", opw, "callfp", o.Arguments, o.TypeID, o.Position)
 }
 
 // Const32 operation pushes an 32 bit literal on the evaluation stack.
