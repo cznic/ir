@@ -290,11 +290,11 @@ func (v *verifier) binop() error {
 	}
 
 	a, b := v.stack[n-2], v.stack[n-1]
-	if a != b {
+	if a != b && !validPtrBinop(v.typeCache, a, b) {
 		return fmt.Errorf("mismatched operand types: %s and %s", a, b)
 	}
 
-	v.stack = append(v.stack[:len(v.stack)-2], a)
+	v.stack = append(v.stack[:n-2], a)
 	return nil
 }
 

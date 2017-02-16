@@ -177,6 +177,7 @@ func (l *linker) checkCalls(p *[]Operation) {
 				}
 			}
 
+			x.FunctionPointer = true
 			static = append(static, -1)
 		case *Call:
 			panic("TODO")
@@ -239,9 +240,12 @@ func (l *linker) defineFunc(e extern, f *FunctionDefinition) (r int) {
 			*Neg,
 			*Neq,
 			*Nil,
+			*Not,
 			*Or,
 			*Panic,
 			*PostIncrement,
+			*PreIncrement,
+			*PtrDiff,
 			*Rem,
 			*Result,
 			*Return,
@@ -303,6 +307,14 @@ func (l *linker) defineData(e extern, d *DataDefinition) (r int) {
 			default:
 				panic("internal error")
 			}
+		case *CompositeValue:
+			for _, v := range x.Values {
+				f(v)
+			}
+		case
+			*Int32Value,
+			*StringValue:
+			// ok, nop.
 		default:
 			panic(fmt.Errorf("%v.%v: internal error: %T", e.unit, e.index, x))
 		}

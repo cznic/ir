@@ -46,9 +46,12 @@ var (
 	_ Operation = (*Neg)(nil)
 	_ Operation = (*Neq)(nil)
 	_ Operation = (*Nil)(nil)
+	_ Operation = (*Not)(nil)
 	_ Operation = (*Or)(nil)
 	_ Operation = (*Panic)(nil)
 	_ Operation = (*PostIncrement)(nil)
+	_ Operation = (*PreIncrement)(nil)
+	_ Operation = (*PtrDiff)(nil)
 	_ Operation = (*Rem)(nil)
 	_ Operation = (*Result)(nil)
 	_ Operation = (*Return)(nil)
@@ -167,7 +170,7 @@ func (o *Argument) verify(v *verifier) error {
 }
 
 func (o *Argument) String() string {
-	return fmt.Sprintf("\t%-*s\t%s%v, %v\t; %s", opw, "argument", addr(o.Address), o.Index, o.TypeID, o.Position)
+	return fmt.Sprintf("\t%-*s\t%s#%v, %v\t; %s", opw, "argument", addr(o.Address), o.Index, o.TypeID, o.Position)
 }
 
 // Arguments operation annotates that function results, if any, are allocated
@@ -175,6 +178,7 @@ func (o *Argument) String() string {
 // follows.
 type Arguments struct {
 	token.Position
+	FunctionPointer bool // TOS contains a function pointer for a subsequent CallFP. Determined by linker.
 }
 
 // Pos implements Operation.
@@ -185,7 +189,11 @@ func (o *Arguments) verify(v *verifier) error {
 }
 
 func (o *Arguments) String() string {
-	return fmt.Sprintf("\t%-*s\t\t; %s", opw, "arguments", o.Position)
+	s := ""
+	if o.FunctionPointer {
+		s = "fp"
+	}
+	return fmt.Sprintf("\t%-*s\t%s\t; %s", opw, "arguments", s, o.Position)
 }
 
 // BeginScope operation annotates entering a block scope.
@@ -208,7 +216,8 @@ func (o *BeginScope) String() string {
 	return fmt.Sprintf("\t%-*s\t\t; %s", opw, "beginScope", o.Position)
 }
 
-// Bool operation converts TOS to a bool (ie. an int32).
+// Bool operation converts TOS to a bool (ie. an int32) such that the result
+// reflects if the operand was non zero.
 type Bool struct {
 	TypeID // Operand type.
 	token.Position
@@ -300,7 +309,7 @@ func (o *Call) verify(v *verifier) error {
 func (o *Call) String() string {
 	s := ""
 	if o.Index >= 0 {
-		s = fmt.Sprintf("[%v], ", o.Index)
+		s = fmt.Sprintf("#%v, ", o.Index)
 	}
 	return fmt.Sprintf("\t%-*s\t%s%v, %s\t; %s", opw, "call", s, o.Arguments, o.TypeID, o.Position)
 }
@@ -732,9 +741,9 @@ func (o *Field) verify(v *verifier) error {
 func (o *Field) String() string {
 	switch {
 	case o.Address:
-		return fmt.Sprintf("\t%-*s\t&%v, %v\t; %s", opw, "field", o.Index, o.TypeID, o.Position)
+		return fmt.Sprintf("\t%-*s\t&#%v, %v\t; %s", opw, "field", o.Index, o.TypeID, o.Position)
 	default:
-		return fmt.Sprintf("\t%-*s\t%v, %v\t; %s", opw, "field", o.Index, o.TypeID, o.Position)
+		return fmt.Sprintf("\t%-*s\t#%v, %v\t; %s", opw, "field", o.Index, o.TypeID, o.Position)
 	}
 }
 
@@ -797,7 +806,7 @@ func (o *Global) verify(v *verifier) error {
 func (o *Global) String() string {
 	s := ""
 	if o.Index >= 0 {
-		s = fmt.Sprintf("%v, ", o.Index)
+		s = fmt.Sprintf("#%v, ", o.Index)
 	}
 	switch o.Linkage {
 	case ExternalLinkage:
@@ -1088,6 +1097,32 @@ func (o *Nil) String() string {
 	return fmt.Sprintf("\t%-*s\t%s\t; %s", opw, "nil", o.TypeID, o.Position)
 }
 
+// Not replaces the boolean value at TOS with !value. The TOS type must be
+// int32.
+type Not struct {
+	token.Position
+}
+
+// Pos implements Operation.
+func (o *Not) Pos() token.Position { return o.Position }
+
+func (o *Not) verify(v *verifier) error {
+	n := len(v.stack)
+	if n == 0 {
+		return fmt.Errorf("evaluation stack underflow")
+	}
+
+	if g, e := v.stack[n-1], TypeID(idInt32); g != e {
+		return fmt.Errorf("unexpected type %s (expected %s)", g, e)
+	}
+
+	return nil
+}
+
+func (o *Not) String() string {
+	return fmt.Sprintf("\t%-*s\t\t; %s", opw, "not", o.Position)
+}
+
 // Or operation replaces TOS with the bitwise or of the top two stack items.
 type Or struct {
 	TypeID // Operands type.
@@ -1167,6 +1202,77 @@ func (o *PostIncrement) String() string {
 	return fmt.Sprintf("\t%-*s\t%v\t; %s", opw, o.TypeID.String()+"++", o.Delta, o.Position)
 }
 
+// PreIncrement operation adds Delta to the value pointed to by address at TOS
+// and replaces TOS by the new value of the pointee.
+type PreIncrement struct {
+	Delta  int
+	TypeID // Operand type.
+	token.Position
+}
+
+// Pos implements Operation.
+func (o *PreIncrement) Pos() token.Position { return o.Position }
+
+func (o *PreIncrement) verify(v *verifier) error {
+	if o.TypeID == 0 {
+		return fmt.Errorf("missing type")
+	}
+
+	n := len(v.stack)
+	if n == 0 {
+		return fmt.Errorf("evaluation stack underflow")
+	}
+
+	t := v.typeCache.MustType(v.stack[n-1])
+	if t.Kind() != Pointer {
+		return fmt.Errorf("expected a pointer at TOS, got %s ", v.stack[n-1])
+	}
+
+	t = t.(*PointerType).Element
+	switch t.Kind() {
+	case Array, Union, Struct, Function:
+		return fmt.Errorf("invalid operand type %s ", v.stack[n-1])
+	}
+
+	if g, e := o.TypeID, t.ID(); g != e {
+		return fmt.Errorf("mismatched operand types %s and %s", g, e)
+	}
+
+	v.stack[n-1] = o.TypeID
+	return nil
+}
+
+func (o *PreIncrement) String() string {
+	return fmt.Sprintf("\t%-*s\t%v\t; %s", opw, "++"+o.TypeID.String(), o.Delta, o.Position)
+}
+
+// PtrDiff operation subtracts the top stack item (b) and the previous one (a)
+// and replaces both operands with a - b.
+type PtrDiff struct {
+	TypeID // Operands type.
+	token.Position
+}
+
+// Pos implements Operation.
+func (o *PtrDiff) Pos() token.Position { return o.Position }
+
+func (o *PtrDiff) verify(v *verifier) error {
+	if o.TypeID == 0 {
+		return fmt.Errorf("missing type")
+	}
+
+	if err := v.binop(); err != nil {
+		return err
+	}
+
+	v.stack[len(v.stack)-1] = o.TypeID
+	return nil
+}
+
+func (o *PtrDiff) String() string {
+	return fmt.Sprintf("\t%-*s\t%s\t; %s", opw, "ptrDiff", o.TypeID, o.Position)
+}
+
 // Rem operation adds the top stack item (b) and the previous one (a) and
 // replaces both operands with a % b.
 type Rem struct {
@@ -1224,7 +1330,7 @@ func (o *Result) verify(v *verifier) error {
 }
 
 func (o *Result) String() string {
-	return fmt.Sprintf("\t%-*s\t%s%v, %v\t; %s", opw, "result", addr(o.Address), o.Index, o.TypeID, o.Position)
+	return fmt.Sprintf("\t%-*s\t%s#%v, %v\t; %s", opw, "result", addr(o.Address), o.Index, o.TypeID, o.Position)
 }
 
 // Return operation removes all function call arguments from the evaluation
@@ -1369,7 +1475,7 @@ func (o *Variable) verify(v *verifier) error {
 }
 
 func (o *Variable) String() string {
-	return fmt.Sprintf("\t%-*s\t%s%v, %v\t; %s", opw, "variable", addr(o.Address), o.Index, o.TypeID, o.Position)
+	return fmt.Sprintf("\t%-*s\t%s#%v, %v\t; %s", opw, "variable", addr(o.Address), o.Index, o.TypeID, o.Position)
 }
 
 // VariableDeclaration operation declares a function local variable. NameID,
@@ -1403,7 +1509,7 @@ func (o *VariableDeclaration) String() string {
 	default:
 		s = fmt.Sprintf("%v", o.TypeID)
 	}
-	return fmt.Sprintf("\t%-*s\t%v, %s, %s\t; %s %s", opw, "varDecl", o.Index, o.NameID, s, o.TypeName, o.Position)
+	return fmt.Sprintf("\t%-*s\t#%v, %s, %s\t; %s %s", opw, "varDecl", o.Index, o.NameID, s, o.TypeName, o.Position)
 }
 
 // Xor operation replaces TOS with the bitwise xor of the top two stack items.
