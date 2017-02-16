@@ -137,25 +137,25 @@ func (f *FunctionDefinition) Verify() (err error) {
 		return fmt.Errorf("invalid operation")
 	}
 
-	vv := &verifier{
+	v := &verifier{
 		function:  f,
 		labels:    map[int]int{},
 		typeCache: TypeCache{},
 	}
-	var v Operation
-	for vv.ip, v = range f.Body {
-		switch x := v.(type) {
+	var op Operation
+	for v.ip, op = range f.Body {
+		switch x := op.(type) {
 		case *BeginScope:
-			vv.blockLevel++
+			v.blockLevel++
 		case *EndScope:
-			if vv.blockLevel == 0 {
-				return fmt.Errorf("unbalanced end scope\n%s:%#x: %v", f.NameID, vv.ip, v)
+			if v.blockLevel == 0 {
+				return fmt.Errorf("unbalanced end scope\n%s:%#x: %v", f.NameID, v.ip, op)
 			}
 
-			vv.blockLevel--
-			if vv.blockLevel == 0 {
-				if _, ok := f.Body[vv.ip-1].(*Return); !ok {
-					return fmt.Errorf("missing return before end of function\n%s:%#x: %v", f.NameID, vv.ip, v)
+			v.blockLevel--
+			if v.blockLevel == 0 {
+				if _, ok := f.Body[v.ip-1].(*Return); !ok {
+					return fmt.Errorf("missing return before end of function\n%s:%#x: %v", f.NameID, v.ip, op)
 				}
 			}
 
@@ -164,22 +164,24 @@ func (f *FunctionDefinition) Verify() (err error) {
 			if n == 0 {
 				n = x.Number
 			}
-			if _, ok := vv.labels[n]; ok {
-				return fmt.Errorf("label redefined\n%s:%#x: %v", f.NameID, vv.ip, v)
+			if _, ok := v.labels[n]; ok {
+				return fmt.Errorf("label redefined\n%s:%#x: %v", f.NameID, v.ip, op)
 			}
 
-			vv.labels[n] = vv.ip
+			v.labels[n] = v.ip
+		case *VariableDeclaration:
+			v.variables = append(v.variables, x.TypeID)
 		}
 	}
 
-	if vv.blockLevel != 0 {
+	if v.blockLevel != 0 {
 		return fmt.Errorf("unbalanced BeginScope/EndScope")
 	}
 
-	for ip, v := range f.Body {
+	for ip, op := range f.Body {
 		var nm NameID
 		var num int
-		switch x := v.(type) {
+		switch x := op.(type) {
 		case *Jmp:
 			nm, num = x.NameID, x.Number
 		case *Jnz:
@@ -194,8 +196,8 @@ func (f *FunctionDefinition) Verify() (err error) {
 		if n == 0 {
 			n = num
 		}
-		if _, ok := vv.labels[n]; !ok {
-			return fmt.Errorf("undefined branch target\n%s:%#x: %v", f.NameID, ip, v)
+		if _, ok := v.labels[n]; !ok {
+			return fmt.Errorf("undefined branch target\n%s:%#x: %v", f.NameID, ip, op)
 		}
 	}
 
@@ -209,12 +211,12 @@ func (f *FunctionDefinition) Verify() (err error) {
 	g = func(ip int, stack []TypeID) error {
 		for {
 			//fmt.Printf("# %#05x %v ; %v\n", ip, stack, f.Body[ip].Pos())
-			v := f.Body[ip]
+			op := f.Body[ip]
 			if visited[ip] != 0 {
 				switch ex, ok := phi[ip]; {
 				case ok:
 					if g, e := len(stack), len(ex); g != e {
-						return fmt.Errorf("evaluation stacks depth differs %v %v\n%s:%#x: %v", stack, ex, f.NameID, ip, v)
+						return fmt.Errorf("evaluation stacks depth differs %v %v\n%s:%#x: %v", stack, ex, f.NameID, ip, op)
 					}
 
 					for i, v := range stack {
@@ -231,27 +233,27 @@ func (f *FunctionDefinition) Verify() (err error) {
 
 			visited[ip] = 1
 
-			vv.ip = ip
-			vv.stack = stack
-			if err := f.Body[ip].verify(vv); err != nil {
-				return fmt.Errorf("%s\n%s:%#x: %v", err, f.NameID, ip, v)
+			v.ip = ip
+			v.stack = stack
+			if err := f.Body[ip].verify(v); err != nil {
+				return fmt.Errorf("%s\n%s:%#x: %v", err, f.NameID, ip, op)
 			}
 
-			stack = vv.stack
+			stack = v.stack
 			switch x := f.Body[ip].(type) {
 			case *Jmp:
 				n := int(x.NameID)
 				if n == 0 {
 					n = x.Number
 				}
-				ip = vv.labels[n]
+				ip = v.labels[n]
 				continue
 			case *Jnz:
 				n := int(x.NameID)
 				if n == 0 {
 					n = x.Number
 				}
-				if err := g(vv.labels[n], append([]TypeID(nil), stack...)); err != nil {
+				if err := g(v.labels[n], append([]TypeID(nil), stack...)); err != nil {
 					return err
 				}
 			case *Jz:
@@ -259,7 +261,7 @@ func (f *FunctionDefinition) Verify() (err error) {
 				if n == 0 {
 					n = x.Number
 				}
-				if err := g(vv.labels[n], append([]TypeID(nil), stack...)); err != nil {
+				if err := g(v.labels[n], append([]TypeID(nil), stack...)); err != nil {
 					return err
 				}
 			case *Label:

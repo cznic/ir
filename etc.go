@@ -25,9 +25,7 @@ func init() {
 var (
 	dict = xc.Dict
 
-	idFloat64 = dict.SID("float64")
 	idInt32   = dict.SID("int32")
-	idInt8    = dict.SID("int8")
 	idInt8Ptr = dict.SID("*int8")
 	idStart   = dict.SID("_start")
 	idVoidPtr = dict.SID("*struct{}")

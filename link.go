@@ -101,7 +101,13 @@ func (l *linker) collectSymbols() {
 						l.extern[x.NameID] = extern{unit: unit, index: i}
 					}
 				case InternalLinkage:
-					panic("TODO")
+					k := intern{x.NameID, unit}
+					switch _, ok := l.intern[k]; {
+					case ok:
+						panic(fmt.Errorf("TODO: %T(%v)", x, x))
+					default:
+						l.intern[k] = i
+					}
 				default:
 					panic("internal error")
 				}

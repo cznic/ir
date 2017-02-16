@@ -1497,7 +1497,6 @@ func (o *VariableDeclaration) verify(v *verifier) error {
 		return fmt.Errorf("missing type")
 	}
 
-	v.variables = append(v.variables, o.TypeID)
 	return nil
 }
 
