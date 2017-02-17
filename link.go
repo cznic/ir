@@ -176,6 +176,7 @@ func (l *linker) checkCalls(p *[]Operation) {
 				case *Global:
 					switch l.out[y.Index].(type) {
 					case *FunctionDefinition:
+						x.FunctionPointer = false
 						static = append(static, y.Index)
 						s[w-1] = x
 						continue

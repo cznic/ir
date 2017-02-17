@@ -70,7 +70,7 @@ type Operation interface {
 }
 
 // Add operation adds the top stack item (b) and the previous one (a) and
-// replaces both operands with a - b.
+// replaces both operands with a + b.
 type Add struct {
 	TypeID // Operands type.
 	token.Position
@@ -115,7 +115,7 @@ func (o *AllocResult) String() string {
 	return fmt.Sprintf("\t%-*s\t%v\t; %s %s", opw, "allocResult", o.TypeID, o.TypeName, o.Position)
 }
 
-// And operation replaces TOS with the bitwise or of the top two stack items.
+// And operation replaces TOS with the bitwise and of the top two stack items.
 type And struct {
 	TypeID // Operands type.
 	token.Position
@@ -383,7 +383,7 @@ func (o *CallFP) String() string {
 	return fmt.Sprintf("\t%-*s\t%v, %s\t; %s", opw, "callfp", o.Arguments, o.TypeID, o.Position)
 }
 
-// Const32 operation pushes an 32 bit literal on the evaluation stack.
+// Const32 operation pushes a 32 bit literal on the evaluation stack.
 type Const32 struct {
 	TypeID
 	Value int32
@@ -406,7 +406,7 @@ func (o *Const32) String() string {
 	return fmt.Sprintf("\t%-*s\t%#x, %v\t; %s", opw, "const", o.Value, o.TypeID, o.Position)
 }
 
-// Const64 operation pushes an 64 bit literal on the evaluation stack.
+// Const64 operation pushes a 64 bit literal on the evaluation stack.
 type Const64 struct {
 	TypeID
 	Value int64
@@ -503,7 +503,8 @@ func (o *Copy) String() string {
 }
 
 // Div operation subtracts the top stack item (b) and the previous one (a) and
-// replaces both operands with a - b.
+// replaces both operands with a / b. The operation panics if operands are
+// integers and b == 0.
 type Div struct {
 	TypeID // Operands type.
 	token.Position
@@ -690,11 +691,16 @@ func (o *Eq) String() string {
 }
 
 // Field replaces a struct/union pointer at TOS with its field by index, or its
-// address.
+// address.  If Bits is non zero then the actual field type is BitFieldType and
+// the bit field of type TypeID starts at bit BitOffset. Bits cannot be non
+// zero if Address is set.
 type Field struct {
-	Address bool
-	Index   int
-	TypeID  // Pointer to a struct/union.
+	Address      bool
+	BitFieldType TypeID
+	BitOffset    int
+	Bits         int
+	Index        int
+	TypeID       // Pointer to a struct/union.
 	token.Position
 }
 
@@ -704,6 +710,14 @@ func (o *Field) Pos() token.Position { return o.Position }
 func (o *Field) verify(v *verifier) error {
 	if o.TypeID == 0 {
 		return fmt.Errorf("missing type")
+	}
+
+	if o.Bits != 0 && o.BitFieldType == 0 {
+		return fmt.Errorf("missing type")
+	}
+
+	if o.Bits != 0 && o.Address {
+		return fmt.Errorf("bit fields are not addressable")
 	}
 
 	n := len(v.stack)
@@ -739,11 +753,15 @@ func (o *Field) verify(v *verifier) error {
 }
 
 func (o *Field) String() string {
+	var s string
+	if o.Bits != 0 {
+		s = fmt.Sprintf(":%d@%d:%v", o.Bits, o.BitOffset, o.BitFieldType)
+	}
 	switch {
 	case o.Address:
-		return fmt.Sprintf("\t%-*s\t&#%v, %v\t; %s", opw, "field", o.Index, o.TypeID, o.Position)
+		return fmt.Sprintf("\t%-*s\t&#%v, %v%s\t; %s", opw, "field", o.Index, o.TypeID, s, o.Position)
 	default:
-		return fmt.Sprintf("\t%-*s\t#%v, %v\t; %s", opw, "field", o.Index, o.TypeID, o.Position)
+		return fmt.Sprintf("\t%-*s\t#%v, %v%s\t; %s", opw, "field", o.Index, o.TypeID, s, o.Position)
 	}
 }
 
@@ -770,7 +788,8 @@ func (o *Geq) String() string {
 	return fmt.Sprintf("\t%-*s\t%s\t; %s", opw, "geq", o.TypeID, o.Position)
 }
 
-// Global operation pushes an external definition on the evaluation stack.
+// Global operation pushes a global variable, or its address, to the evaluation
+// stack.
 type Global struct {
 	Address bool
 	Index   int // A negative value or an object index as resolved by the linker.
@@ -949,9 +968,14 @@ func (o *Leq) String() string {
 	return fmt.Sprintf("\t%-*s\t%s\t; %s", opw, "leq", o.TypeID, o.Position)
 }
 
-// Load replaces a pointer at TOS by its pointee.
+// Load replaces a pointer at TOS by its pointee. If Bits is non zero then the
+// actual pointee type is BitFieldType and the bit field of type *TypeID starts
+// at bit BitOffset.
 type Load struct {
-	TypeID // Pointer type.
+	BitFieldType TypeID
+	BitOffset    int
+	Bits         int
+	TypeID       // Pointer type.
 	token.Position
 }
 
@@ -963,12 +987,20 @@ func (o *Load) verify(v *verifier) error {
 		return fmt.Errorf("missing type")
 	}
 
+	if o.Bits != 0 && o.BitFieldType == 0 {
+		return fmt.Errorf("missing type")
+	}
+
 	n := len(v.stack)
 	if n == 0 {
 		return fmt.Errorf("evaluation stack underflow")
 	}
 
-	if g, e := o.TypeID, v.stack[n-1]; g != e {
+	g := o.TypeID
+	if o.BitFieldType != 0 {
+		g = v.typeCache.MustType(o.BitFieldType).Pointer().ID()
+	}
+	if e := v.stack[n-1]; g != e {
 		return fmt.Errorf("mismatched types, got %s, expected %s", g, e)
 	}
 
@@ -977,13 +1009,17 @@ func (o *Load) verify(v *verifier) error {
 		return fmt.Errorf("expected a pointer type, have %v", o.TypeID)
 	}
 
-	t := pt.(*PointerType).Element
+	t := pt.(*PointerType).Element.ID
 	v.stack[n-1] = t.ID()
 	return nil
 }
 
 func (o *Load) String() string {
-	return fmt.Sprintf("\t%-*s\t%s\t; %s", opw, "load", o.TypeID, o.Position)
+	var s string
+	if o.Bits != 0 {
+		s = fmt.Sprintf(":%d@%d:%v", o.Bits, o.BitOffset, o.BitFieldType)
+	}
+	return fmt.Sprintf("\t%-*s\t%s%s\t; %s", opw, "load", o.TypeID, s, o.Position)
 }
 
 // Lt operation compares the top stack item (b) and the previous one (a) and
@@ -1273,8 +1309,8 @@ func (o *PtrDiff) String() string {
 	return fmt.Sprintf("\t%-*s\t%s\t; %s", opw, "ptrDiff", o.TypeID, o.Position)
 }
 
-// Rem operation adds the top stack item (b) and the previous one (a) and
-// replaces both operands with a % b.
+// Rem operation divides the top stack item (b) and the previous one (a) and
+// replaces both operands with a % b. The operation panics if b == 0.
 type Rem struct {
 	TypeID // Operands type.
 	token.Position
@@ -1334,7 +1370,7 @@ func (o *Result) String() string {
 }
 
 // Return operation removes all function call arguments from the evaluation
-// stack as well as the function pointer used in the call.
+// stack as well as the function pointer used in the call, if any.
 type Return struct {
 	token.Position
 }
@@ -1355,9 +1391,14 @@ func (o *Return) String() string {
 }
 
 // Store operation stores a TOS value at address in the preceding stack
-// position.  The address is removed from the evaluation stack.
+// position.  The address is removed from the evaluation stack.  If Bits is non
+// zero then the actual pointee type is BitFieldType and the bit field of type
+// TypeID starts at bit BitOffset.
 type Store struct {
-	TypeID // Type of the value.
+	BitFieldType TypeID
+	BitOffset    int
+	Bits         int
+	TypeID       // Type of the value.
 	token.Position
 }
 
@@ -1366,6 +1407,10 @@ func (o *Store) Pos() token.Position { return o.Position }
 
 func (o *Store) verify(v *verifier) error {
 	if o.TypeID == 0 {
+		return fmt.Errorf("missing type")
+	}
+
+	if o.Bits != 0 && o.BitFieldType == 0 {
 		return fmt.Errorf("missing type")
 	}
 
@@ -1393,7 +1438,11 @@ func (o *Store) verify(v *verifier) error {
 }
 
 func (o *Store) String() string {
-	return fmt.Sprintf("\t%-*s\t%s\t; %s", opw, "store", o.TypeID, o.Position)
+	var s string
+	if o.Bits != 0 {
+		s = fmt.Sprintf(":%d@%d:%v", o.Bits, o.BitOffset, o.BitFieldType)
+	}
+	return fmt.Sprintf("\t%-*s\t%s%s\t; %s", opw, "store", o.TypeID, s, o.Position)
 }
 
 // StringConst operation pushes a string literal on the evaluation stack.

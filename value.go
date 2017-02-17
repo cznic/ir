@@ -29,7 +29,7 @@ type Value interface {
 }
 
 // AddressValue is a declaration initializer constant of type address. Its
-// value is determined by the linker/loader.
+// final value is determined by the linker/loader.
 type AddressValue struct {
 	valuer
 	Index int // A negative value or object index as resolved by the linker.
