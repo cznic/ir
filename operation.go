@@ -1009,8 +1009,7 @@ func (o *Load) verify(v *verifier) error {
 		return fmt.Errorf("expected a pointer type, have %v", o.TypeID)
 	}
 
-	t := pt.(*PointerType).Element.ID
-	v.stack[n-1] = t.ID()
+	v.stack[n-1] = pt.(*PointerType).Element.ID()
 	return nil
 }
 
