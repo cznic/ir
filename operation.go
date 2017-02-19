@@ -55,6 +55,7 @@ var (
 	_ Operation = (*Rem)(nil)
 	_ Operation = (*Result)(nil)
 	_ Operation = (*Return)(nil)
+	_ Operation = (*Rsh)(nil)
 	_ Operation = (*Store)(nil)
 	_ Operation = (*StringConst)(nil)
 	_ Operation = (*Sub)(nil)
@@ -84,7 +85,7 @@ func (o *Add) verify(v *verifier) error {
 		return fmt.Errorf("missing type")
 	}
 
-	return v.binop()
+	return v.binop(o.TypeID)
 }
 
 func (o *Add) String() string {
@@ -129,7 +130,7 @@ func (o *And) verify(v *verifier) error {
 		return fmt.Errorf("missing type")
 	}
 
-	return v.binop()
+	return v.binop(o.TypeID)
 }
 
 func (o *And) String() string {
@@ -518,7 +519,7 @@ func (o *Div) verify(v *verifier) error {
 		return fmt.Errorf("missing type")
 	}
 
-	return v.binop()
+	return v.binop(o.TypeID)
 }
 
 func (o *Div) String() string {
@@ -574,11 +575,16 @@ func (o *Dup) verify(v *verifier) error {
 		return fmt.Errorf("missing type")
 	}
 
-	if len(v.stack) == 0 {
+	n := len(v.stack)
+	if n == 0 {
 		return fmt.Errorf("evaluation stack underflow")
 	}
 
-	v.stack = append(v.stack, v.stack[len(v.stack)-1])
+	if g, e := v.stack[n-1], o.TypeID; g != e {
+		return fmt.Errorf("operand type mismatch, got %s, expected %s", g, e)
+	}
+
+	v.stack = append(v.stack, o.TypeID)
 	return nil
 }
 
@@ -683,7 +689,7 @@ func (o *Eq) verify(v *verifier) error {
 		return fmt.Errorf("missing type")
 	}
 
-	return v.relop()
+	return v.relop(o.TypeID)
 }
 
 func (o *Eq) String() string {
@@ -691,9 +697,10 @@ func (o *Eq) String() string {
 }
 
 // Field replaces a struct/union pointer at TOS with its field by index, or its
-// address.  If Bits is non zero then the actual field type is BitFieldType and
-// the bit field of type TypeID starts at bit BitOffset. Bits cannot be non
-// zero if Address is set.
+// address.  If Bits is non zero then the effective field type is BitFieldType
+// and it starts at bit BitOffset. Bits cannot be non zero if Address is set.
+//
+// Linker expands this operation such that resulting Bits are always zero.
 type Field struct {
 	Address      bool
 	BitFieldType TypeID
@@ -744,11 +751,20 @@ func (o *Field) verify(v *verifier) error {
 		return fmt.Errorf("invalid index")
 	}
 
-	t = st.Fields[o.Index]
-	if o.Address {
-		t = t.Pointer()
+	switch {
+	case o.Bits != 0:
+		if o.Address {
+			return fmt.Errorf("bit fields are not addressable")
+		}
+
+		v.stack[n-1] = o.BitFieldType
+	default:
+		t = st.Fields[o.Index]
+		if o.Address {
+			t = t.Pointer()
+		}
+		v.stack[n-1] = t.ID()
 	}
-	v.stack[n-1] = t.ID()
 	return nil
 }
 
@@ -781,7 +797,7 @@ func (o *Geq) verify(v *verifier) error {
 		return fmt.Errorf("missing type")
 	}
 
-	return v.relop()
+	return v.relop(o.TypeID)
 }
 
 func (o *Geq) String() string {
@@ -827,12 +843,7 @@ func (o *Global) String() string {
 	if o.Index >= 0 {
 		s = fmt.Sprintf("#%v, ", o.Index)
 	}
-	switch o.Linkage {
-	case ExternalLinkage:
-		return fmt.Sprintf("global\t%-*s\t%s\t; %s %s", opw, s+addr(o.Address)+o.NameID.String(), o.TypeID, o.TypeName, o.Position)
-	default:
-		return fmt.Sprintf("static\t%-*s\t%s\t; %s %s", opw, s+addr(o.Address)+o.NameID.String(), o.TypeID, o.TypeName, o.Position)
-	}
+	return fmt.Sprintf("\t%-*s\t%s, %s\t; %s %s", opw, "global", s+addr(o.Address)+o.NameID.String(), o.TypeID, o.TypeName, o.Position)
 }
 
 // Gt operation compares the top stack item (b) and the previous one (a) and
@@ -851,7 +862,7 @@ func (o *Gt) verify(v *verifier) error {
 		return fmt.Errorf("missing type")
 	}
 
-	return v.relop()
+	return v.relop(o.TypeID)
 }
 
 func (o *Gt) String() string {
@@ -961,7 +972,7 @@ func (o *Leq) verify(v *verifier) error {
 		return fmt.Errorf("missing type")
 	}
 
-	return v.relop()
+	return v.relop(o.TypeID)
 }
 
 func (o *Leq) String() string {
@@ -971,6 +982,8 @@ func (o *Leq) String() string {
 // Load replaces a pointer at TOS by its pointee. If Bits is non zero then the
 // actual pointee type is BitFieldType and the bit field of type *TypeID starts
 // at bit BitOffset.
+//
+// Linker expands this operation such that resulting Bits are always zero.
 type Load struct {
 	BitFieldType TypeID
 	BitOffset    int
@@ -1037,7 +1050,7 @@ func (o *Lt) verify(v *verifier) error {
 		return fmt.Errorf("missing type")
 	}
 
-	return v.relop()
+	return v.relop(o.TypeID)
 }
 
 func (o *Lt) String() string {
@@ -1059,7 +1072,7 @@ func (o *Mul) verify(v *verifier) error {
 		return fmt.Errorf("missing type")
 	}
 
-	return v.binop()
+	return v.binop(o.TypeID)
 }
 
 func (o *Mul) String() string {
@@ -1103,7 +1116,7 @@ func (o *Neq) verify(v *verifier) error {
 		return fmt.Errorf("missing type")
 	}
 
-	return v.relop()
+	return v.relop(o.TypeID)
 }
 
 func (o *Neq) String() string {
@@ -1172,7 +1185,7 @@ func (o *Or) verify(v *verifier) error {
 		return fmt.Errorf("missing type")
 	}
 
-	return v.binop()
+	return v.binop(o.TypeID)
 }
 
 func (o *Or) String() string {
@@ -1282,7 +1295,7 @@ func (o *PreIncrement) String() string {
 }
 
 // PtrDiff operation subtracts the top stack item (b) and the previous one (a)
-// and replaces both operands with a - b.
+// and replaces both operands with a - b of type TypeID.
 type PtrDiff struct {
 	TypeID // Operands type.
 	token.Position
@@ -1296,11 +1309,20 @@ func (o *PtrDiff) verify(v *verifier) error {
 		return fmt.Errorf("missing type")
 	}
 
-	if err := v.binop(); err != nil {
-		return err
+	n := len(v.stack)
+	if n < 2 {
+		return fmt.Errorf("evaluation stack underflow")
 	}
 
-	v.stack[len(v.stack)-1] = o.TypeID
+	if g := v.stack[n-2]; v.typeCache.MustType(g).Kind() != Pointer {
+		return fmt.Errorf("pointer type required, have %s", g)
+	}
+
+	if g, e := v.stack[n-2], v.stack[n-1]; g != e {
+		return fmt.Errorf("mismatched operand types %s and %s", g, e)
+	}
+
+	v.stack = append(v.stack[:n-2], o.TypeID)
 	return nil
 }
 
@@ -1323,7 +1345,7 @@ func (o *Rem) verify(v *verifier) error {
 		return fmt.Errorf("missing type")
 	}
 
-	return v.binop()
+	return v.binop(o.TypeID)
 }
 
 func (o *Rem) String() string {
@@ -1389,10 +1411,65 @@ func (o *Return) String() string {
 	return fmt.Sprintf("\t%-*s\t\t; %s", opw, "return", o.Position)
 }
 
+// Rsh operation uses the top stack item (b), which must be an int32, and the
+// previous one (a), which must be an integral type and replaces both operands
+// with a >> b.
+type Rsh struct {
+	TypeID // Operand (a) type.
+	token.Position
+}
+
+// Pos implements Operation.
+func (o *Rsh) Pos() token.Position { return o.Position }
+
+func (o *Rsh) verify(v *verifier) error {
+	if o.TypeID == 0 {
+		return fmt.Errorf("missing type")
+	}
+
+	switch v.typeCache.MustType(o.TypeID).Kind() {
+	case
+		Int8,
+		Int16,
+		Int32,
+		Int64,
+
+		Uint8,
+		Uint16,
+		Uint32,
+		Uint64:
+		// ok
+	default:
+		return fmt.Errorf("left operand of a shift must be an integral type")
+	}
+
+	n := len(v.stack)
+	if n < 2 {
+		return fmt.Errorf("evaluation stack underflow")
+	}
+
+	if g, e := v.stack[n-2], o.TypeID; g != e {
+		return fmt.Errorf("mismatched operand type, got %s, expected %s", g, e)
+	}
+
+	if g, e := v.stack[n-1], TypeID(idInt32); g != e {
+		return fmt.Errorf("mismatched shift count type, got %s, expected %s", g, e)
+	}
+
+	v.stack = v.stack[:n-1]
+	return nil
+}
+
+func (o *Rsh) String() string {
+	return fmt.Sprintf("\t%-*s\t%s\t; %s", opw, "rsh", o.TypeID, o.Position)
+}
+
 // Store operation stores a TOS value at address in the preceding stack
 // position.  The address is removed from the evaluation stack.  If Bits is non
-// zero then the actual pointee type is BitFieldType and the bit field of type
-// TypeID starts at bit BitOffset.
+// zero then the actual pointee type is BitFieldType and the bit field of
+// effective type TypeID starts at bit BitOffset.
+//
+// Linker rewrites this operation such that resulting Bits are always zero.
 type Store struct {
 	BitFieldType TypeID
 	BitOffset    int
@@ -1424,8 +1501,13 @@ func (o *Store) verify(v *verifier) error {
 		return fmt.Errorf("expected pointer and value at TOS, got %s and %s (%v)", tid, v.stack[p+1], v.stack)
 	}
 
-	if g, e := pt.(*PointerType).Element.ID(), v.stack[p+1]; g != e {
-		return fmt.Errorf("mismatched address and value type: %s and %s", g, e)
+	switch {
+	case o.Bits != 0:
+		// nop
+	default:
+		if g, e := pt.(*PointerType).Element.ID(), v.stack[p+1]; g != e {
+			return fmt.Errorf("mismatched address and value type: %s and %s", g, e)
+		}
 	}
 
 	if g, e := o.TypeID, v.stack[p+1]; g != e {
@@ -1477,7 +1559,7 @@ func (o *Sub) verify(v *verifier) error {
 		return fmt.Errorf("missing type")
 	}
 
-	return v.binop()
+	return v.binop(o.TypeID)
 }
 
 func (o *Sub) String() string {
@@ -1573,7 +1655,7 @@ func (o *Xor) verify(v *verifier) error {
 		return fmt.Errorf("missing type")
 	}
 
-	return v.binop()
+	return v.binop(o.TypeID)
 }
 
 func (o *Xor) String() string {

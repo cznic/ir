@@ -285,7 +285,7 @@ type verifier struct {
 	variables  []TypeID
 }
 
-func (v *verifier) binop() error {
+func (v *verifier) binop(t TypeID) error {
 	n := len(v.stack)
 	if n < 2 {
 		return fmt.Errorf("evaluation stack underflow")
@@ -294,6 +294,10 @@ func (v *verifier) binop() error {
 	a, b := v.stack[n-2], v.stack[n-1]
 	if a != b && !validPtrBinop(v.typeCache, a, b) {
 		return fmt.Errorf("mismatched operand types: %s and %s", a, b)
+	}
+
+	if g, e := a, t; g != e {
+		return fmt.Errorf("mismatched operands types vs result type: %s and %s", g, e)
 	}
 
 	v.stack = append(v.stack[:n-2], a)
@@ -331,8 +335,8 @@ func (v *verifier) unop() error {
 	return nil
 }
 
-func (v *verifier) relop() error {
-	if err := v.binop(); err != nil {
+func (v *verifier) relop(t TypeID) error {
+	if err := v.binop(t); err != nil {
 		return err
 	}
 

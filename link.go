@@ -147,7 +147,53 @@ func (l *linker) initializer(op *VariableDeclaration, v Value) {
 	}
 }
 
-func (l *linker) checkConversions(p *[]Operation) {
+func (l *linker) expandBitfields(p *[]Operation) {
+	s := *p
+	var r []Operation
+	for _, v := range s {
+		switch x := v.(type) {
+		case *Field:
+			if x.Bits == 0 {
+				break
+			}
+
+			if x.Address {
+				panic("internal error")
+			}
+
+			r = append(r, &Field{TypeID: x.TypeID, Position: x.Position})
+			st := l.typeCache.MustType(x.TypeID).(*PointerType).Element
+			ft := st.(*StructOrUnionType).Fields
+			if n := x.BitOffset; n != 0 {
+				r = append(r, &Const32{TypeID: TypeID(idInt32), Value: int32(n), Position: x.Position})
+				r = append(r, &Rsh{TypeID: ft[x.Index].ID(), Position: x.Position})
+			}
+			r = append(r, &Const32{TypeID: ft[x.Index].ID(), Value: int32(1)<<uint(x.Bits) - 1, Position: x.Position})
+			r = append(r, &And{TypeID: ft[x.Index].ID(), Position: x.Position})
+			r = append(r, &Convert{TypeID: ft[x.Index].ID(), Result: x.BitFieldType, Position: x.Position})
+			continue
+		case *Load:
+			if x.Bits == 0 {
+				break
+			}
+
+			r = append(r, &Load{TypeID: l.typeCache.MustType(x.BitFieldType).Pointer().ID(), Position: x.Position})
+			if n := x.BitOffset; n != 0 {
+				r = append(r, &Const32{TypeID: TypeID(idInt32), Value: int32(n), Position: x.Position})
+				r = append(r, &Rsh{TypeID: x.BitFieldType, Position: x.Position})
+			}
+			r = append(r, &Const32{TypeID: x.BitFieldType, Value: int32(1)<<uint(x.Bits) - 1, Position: x.Position})
+			r = append(r, &And{TypeID: x.BitFieldType, Position: x.Position})
+			r = append(r, &Convert{TypeID: x.BitFieldType, Result: l.typeCache.MustType(x.TypeID).(*PointerType).Element.ID(), Position: x.Position})
+			continue
+		}
+
+		r = append(r, v)
+	}
+	*p = r
+}
+
+func (l *linker) unconvert(p *[]Operation) {
 	s := *p
 	w := 0
 	for _, v := range s {
@@ -210,7 +256,8 @@ func (l *linker) defineFunc(e extern, f *FunctionDefinition) (r int) {
 	r = len(l.out)
 	l.defined[e] = r
 	l.out = append(l.out, f)
-	l.checkConversions(&f.Body)
+	l.expandBitfields(&f.Body)
+	l.unconvert(&f.Body)
 	for ip, v := range f.Body {
 		switch x := v.(type) {
 		case
@@ -256,6 +303,7 @@ func (l *linker) defineFunc(e extern, f *FunctionDefinition) (r int) {
 			*Rem,
 			*Result,
 			*Return,
+			*Rsh,
 			*Store,
 			*StringConst,
 			*Sub,
