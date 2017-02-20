@@ -15,6 +15,7 @@ var (
 	_ Value = (*CompositeValue)(nil)
 	_ Value = (*Float64Value)(nil)
 	_ Value = (*Int32Value)(nil)
+	_ Value = (*Int64Value)(nil)
 	_ Value = (*StringValue)(nil)
 )
 
@@ -82,6 +83,14 @@ type Int32Value struct {
 }
 
 func (v *Int32Value) String() string { return fmt.Sprint(v.Value) }
+
+// Int64Value is a declaration initializer constant of type int64.
+type Int64Value struct {
+	valuer
+	Value int64
+}
+
+func (v *Int64Value) String() string { return fmt.Sprint(v.Value) }
 
 // StringValue is a declaration initializer constant of type string.
 type StringValue struct {

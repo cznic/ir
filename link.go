@@ -94,9 +94,9 @@ func (l *linker) collectSymbols() {
 			case *FunctionDefinition:
 				switch x.Linkage {
 				case ExternalLinkage:
-					switch _, ok := l.extern[x.NameID]; {
+					switch ex, ok := l.extern[x.NameID]; {
 					case ok:
-						panic("TODO")
+						panic(fmt.Errorf("TODO: %s: %s, prev at %s", x.Position, x.NameID, l.in[ex.unit][ex.index].(*FunctionDefinition).Position))
 					default:
 						l.extern[x.NameID] = extern{unit: unit, index: i}
 					}
@@ -123,6 +123,7 @@ func (l *linker) initializer(op *VariableDeclaration, v Value) {
 	case
 		*Float64Value,
 		*Int32Value,
+		*Int64Value,
 		*StringValue,
 		nil:
 		// ok
@@ -368,6 +369,7 @@ func (l *linker) defineData(e extern, d *DataDefinition) (r int) {
 			}
 		case
 			*Int32Value,
+			*Int64Value,
 			*StringValue:
 			// ok, nop.
 		default:
