@@ -318,7 +318,7 @@ func (l *linker) defineFunc(e extern, f *FunctionDefinition) (r int) {
 				case ok:
 					x.Index = l.define(ex)
 				default:
-					panic("TODO")
+					panic(fmt.Errorf("%v: %v", x.Position, x.NameID))
 				}
 			case InternalLinkage:
 				switch ex, ok := l.intern[intern{x.NameID, e.unit}]; {
