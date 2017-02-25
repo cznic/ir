@@ -625,7 +625,16 @@ func (o *Element) verify(v *verifier) error {
 	}
 
 	if g, e := o.TypeID, v.stack[n-2]; g != e {
-		return fmt.Errorf("mismatched types, got %s, expected %s", g, e)
+		ok := false
+		if e2 := v.typeCache.MustType(e); e2.Kind() == Pointer {
+			e3 := e2.(*PointerType).Element
+			if e3.Kind() == Array {
+				ok = g == e3.(*ArrayType).Item.Pointer().ID()
+			}
+		}
+		if !ok {
+			return fmt.Errorf("mismatched types, got %s, expected %s", g, e)
+		}
 	}
 
 	pt := v.typeCache.MustType(o.TypeID)
