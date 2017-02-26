@@ -41,6 +41,7 @@ var (
 	_ Operation = (*Label)(nil)
 	_ Operation = (*Leq)(nil)
 	_ Operation = (*Load)(nil)
+	_ Operation = (*Lsh)(nil)
 	_ Operation = (*Lt)(nil)
 	_ Operation = (*Mul)(nil)
 	_ Operation = (*Neg)(nil)
@@ -596,7 +597,8 @@ func (o *Dup) String() string {
 type Element struct {
 	Address   bool
 	IndexType TypeID
-	TypeID    // The indexed type.
+	Neg       bool // Negate the index expression.
+	TypeID         // The indexed type.
 	token.Position
 }
 
@@ -654,11 +656,15 @@ func (o *Element) verify(v *verifier) error {
 }
 
 func (o *Element) String() string {
+	s := ""
+	if o.Neg {
+		s = "-"
+	}
 	switch {
 	case o.Address:
-		return fmt.Sprintf("\t%-*s\t&[%v], %v\t; %s", opw, "element", o.IndexType, o.TypeID, o.Position)
+		return fmt.Sprintf("\t%-*s\t&[%s%v], %v\t; %s", opw, "element", s, o.IndexType, o.TypeID, o.Position)
 	default:
-		return fmt.Sprintf("\t%-*s\t[%v], %v\t; %s", opw, "element", o.IndexType, o.TypeID, o.Position)
+		return fmt.Sprintf("\t%-*s\t[%s%v], %v\t; %s", opw, "element", s, o.IndexType, o.TypeID, o.Position)
 	}
 }
 
@@ -1041,6 +1047,59 @@ func (o *Load) String() string {
 		s = fmt.Sprintf(":%d@%d:%v", o.Bits, o.BitOffset, o.BitFieldType)
 	}
 	return fmt.Sprintf("\t%-*s\t%s%s\t; %s", opw, "load", o.TypeID, s, o.Position)
+}
+
+// Lsh operation uses the top stack item (b), which must be an int32, and the
+// previous one (a), which must be an integral type and replaces both operands
+// with a << b.
+type Lsh struct {
+	TypeID // Operand (a) type.
+	token.Position
+}
+
+// Pos implements Operation.
+func (o *Lsh) Pos() token.Position { return o.Position }
+
+func (o *Lsh) verify(v *verifier) error {
+	if o.TypeID == 0 {
+		return fmt.Errorf("missing type")
+	}
+
+	switch v.typeCache.MustType(o.TypeID).Kind() {
+	case
+		Int8,
+		Int16,
+		Int32,
+		Int64,
+
+		Uint8,
+		Uint16,
+		Uint32,
+		Uint64:
+		// ok
+	default:
+		return fmt.Errorf("left operand of a shift must be an integral type")
+	}
+
+	n := len(v.stack)
+	if n < 2 {
+		return fmt.Errorf("evaluation stack underflow")
+	}
+
+	if g, e := v.stack[n-2], o.TypeID; g != e {
+		return fmt.Errorf("mismatched operand type, got %s, expected %s", g, e)
+	}
+
+	if g, e := v.stack[n-1], TypeID(idInt32); g != e {
+		return fmt.Errorf("mismatched shift count type, got %s, expected %s", g, e)
+	}
+
+	v.stack = v.stack[:n-1]
+	return nil
+}
+
+func (o *Lsh) String() string {
+	return fmt.Sprintf("\t%-*s\t%s\t; %s", opw, "lsh", o.TypeID, o.Position)
 }
 
 // Lt operation compares the top stack item (b) and the previous one (a) and

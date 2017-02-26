@@ -290,6 +290,7 @@ func (l *linker) defineFunc(e extern, f *FunctionDefinition) (r int) {
 			*Label,
 			*Leq,
 			*Load,
+			*Lsh,
 			*Lt,
 			*Mul,
 			*Neg,
