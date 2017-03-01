@@ -13,6 +13,7 @@ import (
 var (
 	_ Value = (*AddressValue)(nil)
 	_ Value = (*CompositeValue)(nil)
+	_ Value = (*DesignatedValue)(nil)
 	_ Value = (*Float64Value)(nil)
 	_ Value = (*Int32Value)(nil)
 	_ Value = (*Int64Value)(nil)
@@ -67,6 +68,15 @@ func (v *CompositeValue) String() string {
 	b.WriteByte('}')
 	return string(b.Bytes())
 }
+
+// DesignatedValue represents the value of a particular array element or a
+// particular struct field.
+type DesignatedValue struct {
+	Index int // Array index or field index.
+	Value
+}
+
+func (v *DesignatedValue) String() string { return fmt.Sprintf("%v: %v", v.Index, v.Value) }
 
 // Float64Value is a declaration initializer constant of type float64.
 type Float64Value struct {

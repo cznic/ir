@@ -162,11 +162,11 @@ func (l *linker) expandBitfields(p *[]Operation) {
 				panic("internal error")
 			}
 
-			r = append(r, &Field{TypeID: x.TypeID, Position: x.Position})
+			r = append(r, &Field{Index: x.Index, TypeID: x.TypeID, Position: x.Position})
 			st := l.typeCache.MustType(x.TypeID).(*PointerType).Element
 			ft := st.(*StructOrUnionType).Fields
 			if n := x.BitOffset; n != 0 {
-				r = append(r, &Const32{TypeID: TypeID(idInt32), Value: int32(n), Position: x.Position})
+				r = append(r, &Const32{TypeID: idInt32, Value: int32(n), Position: x.Position})
 				r = append(r, &Rsh{TypeID: ft[x.Index].ID(), Position: x.Position})
 			}
 			r = append(r, &Const32{TypeID: ft[x.Index].ID(), Value: int32(1)<<uint(x.Bits) - 1, Position: x.Position})
@@ -180,7 +180,7 @@ func (l *linker) expandBitfields(p *[]Operation) {
 
 			r = append(r, &Load{TypeID: l.typeCache.MustType(x.BitFieldType).Pointer().ID(), Position: x.Position})
 			if n := x.BitOffset; n != 0 {
-				r = append(r, &Const32{TypeID: TypeID(idInt32), Value: int32(n), Position: x.Position})
+				r = append(r, &Const32{TypeID: idInt32, Value: int32(n), Position: x.Position})
 				r = append(r, &Rsh{TypeID: x.BitFieldType, Position: x.Position})
 			}
 			r = append(r, &Const32{TypeID: x.BitFieldType, Value: int32(1)<<uint(x.Bits) - 1, Position: x.Position})

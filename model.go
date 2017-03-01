@@ -118,7 +118,9 @@ func (m MemoryModel) Layout(t *StructOrUnionType) []FieldProperties {
 			sz := m.Sizeof(v)
 			a := m.StructAlignof(v)
 			z := off
-			off = roundup(off, int64(a))
+			if a != 0 {
+				off = roundup(off, int64(a))
+			}
 			if off != z {
 				r[i-1].Padding = int(off - z)
 			}
@@ -163,7 +165,9 @@ func (m MemoryModel) Sizeof(t Type) int64 {
 			for _, v := range x.Fields {
 				sz := m.Sizeof(v)
 				a := m.StructAlignof(v)
-				off = roundup(off, int64(a))
+				if a != 0 {
+					off = roundup(off, int64(a))
+				}
 				off += sz
 			}
 			return roundup(off, int64(m.Alignof(t)))

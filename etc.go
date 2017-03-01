@@ -25,10 +25,10 @@ func init() {
 var (
 	dict = xc.Dict
 
-	idInt32   = dict.SID("int32")
-	idInt8Ptr = dict.SID("*int8")
+	idInt32   = TypeID(dict.SID("int32"))
+	idInt8Ptr = TypeID(dict.SID("*int8"))
 	idStart   = dict.SID("_start")
-	idVoidPtr = dict.SID("*struct{}")
+	idVoidPtr = TypeID(dict.SID("*struct{}"))
 
 	printHooks = strutil.PrettyPrintHooks{
 		reflect.TypeOf(NameID(0)): func(f strutil.Formatter, v interface{}, prefix, suffix string) {
@@ -101,22 +101,4 @@ func addr(n bool) string {
 	}
 
 	return ""
-}
-
-func validPtrBinop(tc TypeCache, a, b TypeID) bool {
-	t := tc.MustType(a)
-	u := tc.MustType(b)
-	if t.Kind() != Pointer && u.Kind() == Pointer {
-		t, u = u, t
-	}
-	if t.Kind() != Pointer {
-		return false
-	}
-
-	switch t.Kind() {
-	case Int8, Int16, Int32, Int64, Uint8, Uint16, Uint32, Uint64:
-		return true
-	}
-
-	return false
 }

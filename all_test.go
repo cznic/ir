@@ -307,6 +307,7 @@ func TestAlignSize(t *testing.T) {
 		{"[2]union{int64,int8}", 8, 16},
 		{"[2]union{int8,int64}", 8, 16},
 		{"func()", 8, 8},
+		{"struct{int32,struct{},int32}", 4, 8},
 		{"struct{int64,int8}", 8, 16},
 		{"struct{int64}", 8, 8},
 		{"struct{}", 0, 0},

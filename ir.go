@@ -285,6 +285,24 @@ type verifier struct {
 	variables  []TypeID
 }
 
+func (v *verifier) validPtrBinop(a, b TypeID) bool {
+	t := v.typeCache.MustType(a)
+	u := v.typeCache.MustType(b)
+	if t.Kind() != Pointer && u.Kind() == Pointer {
+		t, u = u, t
+	}
+	if t.Kind() != Pointer {
+		return false
+	}
+
+	switch t.Kind() {
+	case Int8, Int16, Int32, Int64, Uint8, Uint16, Uint32, Uint64:
+		return true
+	}
+
+	return false
+}
+
 func (v *verifier) binop(t TypeID) error {
 	n := len(v.stack)
 	if n < 2 {
@@ -292,7 +310,7 @@ func (v *verifier) binop(t TypeID) error {
 	}
 
 	a, b := v.stack[n-2], v.stack[n-1]
-	if a != b && !validPtrBinop(v.typeCache, a, b) {
+	if a != b && !v.validPtrBinop(a, b) {
 		return fmt.Errorf("mismatched operand types: %s and %s", a, b)
 	}
 
@@ -340,7 +358,7 @@ func (v *verifier) relop(t TypeID) error {
 		return err
 	}
 
-	v.stack[len(v.stack)-1] = TypeID(idInt32)
+	v.stack[len(v.stack)-1] = idInt32
 	return nil
 }
 
@@ -350,10 +368,43 @@ func (v *verifier) branch() error {
 		return fmt.Errorf("evaluation stack underflow")
 	}
 
-	if g, e := v.stack[n-1], TypeID(idInt32); g != e {
+	if g, e := v.stack[n-1], idInt32; g != e {
 		return fmt.Errorf("unexpected branch stack item of type %s (expected %s)", g, e)
 	}
 
 	v.stack = v.stack[:n-1]
 	return nil
+}
+
+func (v *verifier) assignable(a, b TypeID) bool {
+	if a == b {
+		return true
+	}
+
+	t := v.typeCache.MustType(a)
+	u := v.typeCache.MustType(b)
+
+	if t.Kind() == Pointer && u.Kind() == Pointer {
+		if a == idVoidPtr || b == idVoidPtr {
+			return true
+		}
+
+		return v.xsign(t.(*PointerType).Element) == v.xsign(u.(*PointerType).Element)
+	}
+
+	return false
+}
+
+func (v *verifier) xsign(t Type) TypeKind {
+	switch t.Kind() {
+	case Int8:
+		return Uint8
+	case Int16:
+		return Uint16
+	case Int32:
+		return Uint32
+	case Int64:
+		return Uint64
+	}
+	return t.Kind()
 }

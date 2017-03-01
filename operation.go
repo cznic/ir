@@ -242,7 +242,7 @@ func (o *Bool) verify(v *verifier) error {
 		return fmt.Errorf("mismatched types, got %s, expected %s", g, e)
 	}
 
-	v.stack[n-1] = TypeID(idInt32)
+	v.stack[n-1] = idInt32
 	return nil
 }
 
@@ -284,22 +284,18 @@ func (o *Call) verify(v *verifier) error {
 	}
 
 	for i, r := range results {
-		if g, e := v.stack[ap-len(results)+i], r.ID(); g != e {
+		if g, e := v.stack[ap-len(results)+i], r.ID(); g != e && !v.assignable(g, e) {
 			return fmt.Errorf("mismatched result #%v, got %s, expected %s", i, g, e)
 		}
 	}
 
 	args := t.(*FunctionType).Arguments
-	for i, v := range v.stack[ap:] {
+	for i, val := range v.stack[ap:] {
 		if i >= len(args) {
 			break
 		}
 
-		if g, e := v, args[i].ID(); g != e {
-			if e == TypeID(idVoidPtr) && args[i].Kind() == Pointer {
-				continue
-			}
-
+		if g, e := val, args[i].ID(); g != e && !v.assignable(g, e) {
 			return fmt.Errorf("invalid argument #%v type, got %v, expected %s", i, g, e)
 		}
 	}
@@ -357,22 +353,18 @@ func (o *CallFP) verify(v *verifier) error {
 
 	for i, r := range results {
 		// | #0 | fp |
-		if g, e := v.stack[fp-len(results)+i], r.ID(); g != e {
+		if g, e := v.stack[fp-len(results)+i], r.ID(); g != e && !v.assignable(g, e) {
 			return fmt.Errorf("mismatched result #%v, got %s, expected %s", i, g, e)
 		}
 	}
 
 	args := t.(*FunctionType).Arguments
-	for i, v := range v.stack[fp+1:] {
+	for i, val := range v.stack[fp+1:] {
 		if i >= len(args) {
 			break
 		}
 
-		if g, e := v, args[i].ID(); g != e {
-			if e == TypeID(idVoidPtr) && args[i].Kind() == Pointer {
-				continue
-			}
-
+		if g, e := val, args[i].ID(); g != e && !v.assignable(g, e) {
 			return fmt.Errorf("invalid argument #%v type, got %v, expected %s", i, g, e)
 		}
 	}
@@ -488,11 +480,11 @@ func (o *Copy) verify(v *verifier) error {
 		t = t.(*ArrayType).Item
 	}
 	t = t.Pointer()
-	if g, e := v.stack[n-2], t.ID(); g != e && g != TypeID(idVoidPtr) {
+	if g, e := v.stack[n-2], t.ID(); g != e && g != idVoidPtr {
 		return fmt.Errorf("mismatched destination type, got %s, expected %s", g, e)
 	}
 
-	if g, e := v.stack[n-1], t.ID(); g != e && g != TypeID(idVoidPtr) {
+	if g, e := v.stack[n-1], t.ID(); g != e && g != idVoidPtr {
 		return fmt.Errorf("mismatched source ype, got %s, expected %s", g, e)
 	}
 
@@ -551,7 +543,7 @@ func (o *Drop) verify(v *verifier) error {
 	case Array:
 		t = t.(*ArrayType).Item.Pointer()
 	}
-	if g, e := v.stack[n-1], t.ID(); g != e {
+	if g, e := v.stack[n-1], t.ID(); !v.assignable(g, e) {
 		return fmt.Errorf("operand type mismatch, got %s, expected %s", g, e)
 	}
 	v.stack = v.stack[:len(v.stack)-1]
@@ -1090,7 +1082,7 @@ func (o *Lsh) verify(v *verifier) error {
 		return fmt.Errorf("mismatched operand type, got %s, expected %s", g, e)
 	}
 
-	if g, e := v.stack[n-1], TypeID(idInt32); g != e {
+	if g, e := v.stack[n-1], idInt32; g != e {
 		return fmt.Errorf("mismatched shift count type, got %s, expected %s", g, e)
 	}
 
@@ -1228,7 +1220,7 @@ func (o *Not) verify(v *verifier) error {
 		return fmt.Errorf("evaluation stack underflow")
 	}
 
-	if g, e := v.stack[n-1], TypeID(idInt32); g != e {
+	if g, e := v.stack[n-1], idInt32; g != e {
 		return fmt.Errorf("unexpected type %s (expected %s)", g, e)
 	}
 
@@ -1520,7 +1512,7 @@ func (o *Rsh) verify(v *verifier) error {
 		return fmt.Errorf("mismatched operand type, got %s, expected %s", g, e)
 	}
 
-	if g, e := v.stack[n-1], TypeID(idInt32); g != e {
+	if g, e := v.stack[n-1], idInt32; g != e {
 		return fmt.Errorf("mismatched shift count type, got %s, expected %s", g, e)
 	}
 
@@ -1573,12 +1565,12 @@ func (o *Store) verify(v *verifier) error {
 	case o.Bits != 0:
 		// nop
 	default:
-		if g, e := pt.(*PointerType).Element.ID(), v.stack[p+1]; g != e {
+		if g, e := pt.(*PointerType).Element.ID(), v.stack[p+1]; !v.assignable(g, e) {
 			return fmt.Errorf("mismatched address and value type: %s and %s", g, e)
 		}
 	}
 
-	if g, e := o.TypeID, v.stack[p+1]; g != e {
+	if g, e := o.TypeID, v.stack[p+1]; !v.assignable(g, e) {
 		return fmt.Errorf("mismatched address and value type: %s and %s", g, e)
 	}
 
@@ -1604,12 +1596,12 @@ type StringConst struct {
 func (o *StringConst) Pos() token.Position { return o.Position }
 
 func (o *StringConst) verify(v *verifier) error {
-	v.stack = append(v.stack, TypeID(idInt8Ptr))
+	v.stack = append(v.stack, idInt8Ptr)
 	return nil
 }
 
 func (o *StringConst) String() string {
-	return fmt.Sprintf("\t%-*s\t%q, %s\t; %s", opw, "const", o.Value, dict.S(idInt8Ptr), o.Position)
+	return fmt.Sprintf("\t%-*s\t%q, %s\t; %s", opw, "const", o.Value, dict.S(int(idInt8Ptr)), o.Position)
 }
 
 // Sub operation subtracts the top stack item (b) and the previous one (a) and
