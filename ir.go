@@ -170,6 +170,10 @@ func (f *FunctionDefinition) Verify() (err error) {
 
 			v.labels[n] = v.ip
 		case *VariableDeclaration:
+			if g, e := x.Index, len(v.variables); g != e {
+				return fmt.Errorf("invalid variable declaration operation index, got %v, expected %v", g, e)
+			}
+
 			v.variables = append(v.variables, x.TypeID)
 		}
 	}

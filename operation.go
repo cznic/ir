@@ -739,7 +739,7 @@ func (o *Field) verify(v *verifier) error {
 		return fmt.Errorf("evaluation stack underflow")
 	}
 
-	if g, e := o.TypeID, v.stack[n-1]; g != e {
+	if g, e := o.TypeID, v.stack[n-1]; g != e && !v.assignable(g, e) {
 		return fmt.Errorf("mismatched field pointer types, got %s, expected %s", g, e)
 	}
 
@@ -1357,7 +1357,8 @@ func (o *PreIncrement) String() string {
 // PtrDiff operation subtracts the top stack item (b) and the previous one (a)
 // and replaces both operands with a - b of type TypeID.
 type PtrDiff struct {
-	TypeID // Operands type.
+	PtrType TypeID
+	TypeID  // Operands type.
 	token.Position
 }
 
@@ -1365,8 +1366,12 @@ type PtrDiff struct {
 func (o *PtrDiff) Pos() token.Position { return o.Position }
 
 func (o *PtrDiff) verify(v *verifier) error {
-	if o.TypeID == 0 {
+	if o.TypeID == 0 || o.PtrType == 0 {
 		return fmt.Errorf("missing type")
+	}
+
+	if v.typeCache.MustType(o.PtrType).Kind() != Pointer {
+		return fmt.Errorf("expected pointer type, have '%s'", o.PtrType)
 	}
 
 	n := len(v.stack)
