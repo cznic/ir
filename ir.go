@@ -290,6 +290,10 @@ type verifier struct {
 }
 
 func (v *verifier) validPtrBinop(a, b TypeID) bool {
+	if v.assignable(a, b) {
+		return true
+	}
+
 	t := v.typeCache.MustType(a)
 	u := v.typeCache.MustType(b)
 	if t.Kind() != Pointer && u.Kind() == Pointer {

@@ -771,7 +771,12 @@ func (o *Field) verify(v *verifier) error {
 	default:
 		t = st.Fields[o.Index]
 		if o.Address {
-			t = t.Pointer()
+			switch t.Kind() {
+			case Array:
+				t = t.(*ArrayType).Item.Pointer()
+			default:
+				t = t.Pointer()
+			}
 		}
 		v.stack[n-1] = t.ID()
 	}
