@@ -25,10 +25,11 @@ func init() {
 var (
 	dict = xc.Dict
 
-	idInt32   = TypeID(dict.SID("int32"))
-	idInt8Ptr = TypeID(dict.SID("*int8"))
-	idStart   = dict.SID("_start")
-	idVoidPtr = TypeID(dict.SID("*struct{}"))
+	idInt32    = TypeID(dict.SID("int32"))
+	idInt8Ptr  = TypeID(dict.SID("*int8"))
+	idStart    = dict.SID("_start")
+	idVoidPtr  = TypeID(dict.SID("*struct{}"))
+	idWcharPtr = TypeID(dict.SID("*int32"))
 
 	printHooks = strutil.PrettyPrintHooks{
 		reflect.TypeOf(NameID(0)): func(f strutil.Formatter, v interface{}, prefix, suffix string) {

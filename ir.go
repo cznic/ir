@@ -399,6 +399,23 @@ func (v *verifier) assignable(a, b TypeID) bool {
 	return false
 }
 
+func (v *verifier) isPtr(t TypeID) bool {
+	u := v.typeCache.MustType(t)
+	return u.Kind() == Pointer
+}
+
+func (v *verifier) isVoidPtr(t TypeID) bool {
+	u := v.typeCache.MustType(t)
+	for u.Kind() == Pointer {
+		if u.ID() == idVoidPtr {
+			return true
+		}
+
+		u = u.(*PointerType).Element
+	}
+	return false
+}
+
 func (v *verifier) xsign(t Type) TypeKind {
 	switch t.Kind() {
 	case Int8:

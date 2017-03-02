@@ -627,7 +627,10 @@ func (o *Element) verify(v *verifier) error {
 			}
 		}
 		if !ok {
-			return fmt.Errorf("mismatched types, got %s, expected %s", g, e)
+			ok = v.isVoidPtr(e) && v.isPtr(g)
+		}
+		if !ok {
+			return fmt.Errorf("mismatched type, got %s, expected %s", g, e)
 		}
 	}
 
@@ -1594,6 +1597,7 @@ func (o *Store) String() string {
 // StringConst operation pushes a string literal on the evaluation stack.
 type StringConst struct {
 	Value StringID
+	Wide  bool // Element is wchar_t.
 	token.Position
 }
 
@@ -1601,12 +1605,22 @@ type StringConst struct {
 func (o *StringConst) Pos() token.Position { return o.Position }
 
 func (o *StringConst) verify(v *verifier) error {
-	v.stack = append(v.stack, idInt8Ptr)
+	switch {
+	case o.Wide:
+		v.stack = append(v.stack, idWcharPtr)
+	default:
+		v.stack = append(v.stack, idInt8Ptr)
+	}
 	return nil
 }
 
 func (o *StringConst) String() string {
-	return fmt.Sprintf("\t%-*s\t%q, %s\t; %s", opw, "const", o.Value, dict.S(int(idInt8Ptr)), o.Position)
+	switch {
+	case o.Wide:
+		return fmt.Sprintf("\t%-*s\t%q, %s\t; %s", opw, "const", o.Value, dict.S(int(idWcharPtr)), o.Position)
+	default:
+		return fmt.Sprintf("\t%-*s\t%q, %s\t; %s", opw, "const", o.Value, dict.S(int(idInt8Ptr)), o.Position)
+	}
 }
 
 // Sub operation subtracts the top stack item (b) and the previous one (a) and
