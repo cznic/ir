@@ -275,6 +275,7 @@ func (l *linker) defineFunc(e extern, f *FunctionDefinition) (r int) {
 			*Const64,
 			*Convert,
 			*Copy,
+			*Cpl,
 			*Div,
 			*Drop,
 			*Dup,

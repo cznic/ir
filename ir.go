@@ -322,7 +322,7 @@ func (v *verifier) binop(t TypeID) error {
 		return fmt.Errorf("mismatched operand types: %s and %s", a, b)
 	}
 
-	if g, e := a, t; g != e {
+	if g, e := a, t; t != 0 && g != e {
 		return fmt.Errorf("mismatched operands types vs result type: %s and %s", g, e)
 	}
 
@@ -330,7 +330,7 @@ func (v *verifier) binop(t TypeID) error {
 	return nil
 }
 
-func (v *verifier) unop() error {
+func (v *verifier) unop(int bool) error {
 	n := len(v.stack)
 	if n == 0 {
 		return fmt.Errorf("evaluation stack underflow")
@@ -347,13 +347,17 @@ func (v *verifier) unop() error {
 		Uint8,
 		Uint16,
 		Uint32,
-		Uint64,
+		Uint64:
 
+		// ok
+	case
 		Float32,
 		Float64,
 		Float128:
 
-		// ok
+		if int {
+			return fmt.Errorf("invalid operand type: %s ", a)
+		}
 	default:
 		return fmt.Errorf("invalid operand type: %s ", a)
 	}
@@ -362,7 +366,7 @@ func (v *verifier) unop() error {
 }
 
 func (v *verifier) relop(t TypeID) error {
-	if err := v.binop(t); err != nil {
+	if err := v.binop(0); err != nil {
 		return err
 	}
 
@@ -393,7 +397,7 @@ func (v *verifier) assignable(a, b TypeID) bool {
 	u := v.typeCache.MustType(b)
 
 	if t.Kind() == Pointer && u.Kind() == Pointer {
-		if a == idVoidPtr || b == idVoidPtr {
+		if a == idVoidPtr || b == idVoidPtr || v.isVoidPtr(a) || v.isVoidPtr(b) {
 			return true
 		}
 

@@ -25,6 +25,7 @@ var (
 	_ Operation = (*Const64)(nil)
 	_ Operation = (*Convert)(nil)
 	_ Operation = (*Copy)(nil)
+	_ Operation = (*Cpl)(nil)
 	_ Operation = (*Div)(nil)
 	_ Operation = (*Drop)(nil)
 	_ Operation = (*Dup)(nil)
@@ -496,6 +497,27 @@ func (o *Copy) String() string {
 	return fmt.Sprintf("\t%-*s\t%s\t; %s", opw, "copy", o.TypeID, o.Position)
 }
 
+// Cpl operation replaces TOS with ^TOS (bitwise complement).
+type Cpl struct {
+	TypeID // Operand type.
+	token.Position
+}
+
+// Pos implements Operation.
+func (o *Cpl) Pos() token.Position { return o.Position }
+
+func (o *Cpl) verify(v *verifier) error {
+	if o.TypeID == 0 {
+		return fmt.Errorf("missing type")
+	}
+
+	return v.unop(true)
+}
+
+func (o *Cpl) String() string {
+	return fmt.Sprintf("\t%-*s\t%s\t; %s", opw, "cpl", o.TypeID, o.Position)
+}
+
 // Div operation subtracts the top stack item (b) and the previous one (a) and
 // replaces both operands with a / b. The operation panics if operands are
 // integers and b == 0.
@@ -573,7 +595,7 @@ func (o *Dup) verify(v *verifier) error {
 		return fmt.Errorf("evaluation stack underflow")
 	}
 
-	if g, e := v.stack[n-1], o.TypeID; g != e {
+	if g, e := v.stack[n-1], o.TypeID; g != e && !v.assignable(g, e) {
 		return fmt.Errorf("operand type mismatch, got %s, expected %s", g, e)
 	}
 
@@ -1161,7 +1183,7 @@ func (o *Neg) verify(v *verifier) error {
 		return fmt.Errorf("missing type")
 	}
 
-	return v.unop()
+	return v.unop(false)
 }
 
 func (o *Neg) String() string {
