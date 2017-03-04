@@ -76,13 +76,17 @@ func (l *linker) collectSymbols() {
 				case ExternalLinkage:
 					switch ex, ok := l.extern[x.NameID]; {
 					case ok:
-						dd := l.in[ex.unit][ex.index].(*DataDefinition)
-						if x.TypeID != dd.TypeID {
-							panic("internal error")
-						}
+						switch def := l.in[ex.unit][ex.index].(type) {
+						case *DataDefinition:
+							if x.TypeID != def.TypeID {
+								panic("internal error")
+							}
 
-						if x.Value != nil && dd.Value == nil {
-							dd.Value = x.Value
+							if x.Value != nil && def.Value == nil {
+								def.Value = x.Value
+							}
+						default:
+							panic(fmt.Errorf("internal error %T", def))
 						}
 					default:
 						l.extern[x.NameID] = extern{unit: unit, index: i}
@@ -103,7 +107,23 @@ func (l *linker) collectSymbols() {
 				case ExternalLinkage:
 					switch ex, ok := l.extern[x.NameID]; {
 					case ok:
-						panic(fmt.Errorf("TODO: %s: %s, prev at %s", x.Position, x.NameID, l.in[ex.unit][ex.index].(*FunctionDefinition).Position))
+						switch def := l.in[ex.unit][ex.index].(type) {
+						case *FunctionDefinition:
+							if x.TypeID != def.TypeID {
+								panic("internal error")
+							}
+
+							if len(def.Body) == 1 {
+								if _, ok := def.Body[0].(*Panic); ok {
+									x = def
+									break
+								}
+							}
+
+							panic(fmt.Errorf("internal error %T", def))
+						default:
+							panic(fmt.Errorf("internal error %T", def))
+						}
 					default:
 						l.extern[x.NameID] = extern{unit: unit, index: i}
 					}
