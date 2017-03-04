@@ -165,7 +165,11 @@ func (o *Argument) verify(v *verifier) error {
 		t = t.Pointer()
 	}
 	if g, e := o.TypeID, t.ID(); g != e {
-		return fmt.Errorf("expected type %s", e)
+		u := v.typeCache.MustType(e)
+		ok := u.Kind() == Array && g == u.(*ArrayType).Item.Pointer().ID()
+		if !ok {
+			return fmt.Errorf("have %s, expected type %s", g, e)
+		}
 	}
 
 	v.stack = append(v.stack, o.TypeID)
@@ -239,7 +243,7 @@ func (o *Bool) verify(v *verifier) error {
 		return fmt.Errorf("evaluation stack underflow")
 	}
 
-	if g, e := v.stack[n-1], o.TypeID; g != e {
+	if g, e := v.stack[n-1], o.TypeID; g != e && !v.assignable(g, e) {
 		return fmt.Errorf("mismatched types, got %s, expected %s", g, e)
 	}
 
@@ -297,7 +301,11 @@ func (o *Call) verify(v *verifier) error {
 		}
 
 		if g, e := val, args[i].ID(); g != e && !v.assignable(g, e) {
-			return fmt.Errorf("invalid argument #%v type, got %v, expected %s", i, g, e)
+			u := v.typeCache.MustType(e)
+			ok := u.Kind() == Array && g == u.(*ArrayType).Item.Pointer().ID()
+			if !ok {
+				return fmt.Errorf("invalid argument #%v type, got %v, expected %s", i, g, e)
+			}
 		}
 	}
 
@@ -366,7 +374,11 @@ func (o *CallFP) verify(v *verifier) error {
 		}
 
 		if g, e := val, args[i].ID(); g != e && !v.assignable(g, e) {
-			return fmt.Errorf("invalid argument #%v type, got %v, expected %s", i, g, e)
+			u := v.typeCache.MustType(e)
+			ok := u.Kind() == Array && g == u.(*ArrayType).Item.Pointer().ID()
+			if !ok {
+				return fmt.Errorf("invalid argument #%v type, got %v, expected %s", i, g, e)
+			}
 		}
 	}
 

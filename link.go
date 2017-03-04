@@ -74,9 +74,16 @@ func (l *linker) collectSymbols() {
 			case *DataDefinition:
 				switch x.Linkage {
 				case ExternalLinkage:
-					switch _, ok := l.extern[x.NameID]; {
+					switch ex, ok := l.extern[x.NameID]; {
 					case ok:
-						panic(fmt.Errorf("TODO: %T(%v)", x, x))
+						dd := l.in[ex.unit][ex.index].(*DataDefinition)
+						if x.TypeID != dd.TypeID {
+							panic("internal error")
+						}
+
+						if x.Value != nil && dd.Value == nil {
+							dd.Value = x.Value
+						}
 					default:
 						l.extern[x.NameID] = extern{unit: unit, index: i}
 					}
@@ -121,6 +128,7 @@ func (l *linker) collectSymbols() {
 func (l *linker) initializer(op *VariableDeclaration, v Value) {
 	switch x := v.(type) {
 	case
+		*Float32Value,
 		*Float64Value,
 		*Int32Value,
 		*Int64Value,
@@ -320,7 +328,7 @@ func (l *linker) defineFunc(e extern, f *FunctionDefinition) (r int) {
 				case ok:
 					x.Index = l.define(ex)
 				default:
-					panic(fmt.Errorf("%v: %v", x.Position, x.NameID))
+					panic(fmt.Errorf("%v: undefined %v", x.Position, x.NameID))
 				}
 			case InternalLinkage:
 				switch ex, ok := l.intern[intern{x.NameID, e.unit}]; {

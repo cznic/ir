@@ -357,7 +357,7 @@ func (c TypeCache) parseTypeList(p *[]byte) ([]Type, error) {
 
 func (c TypeCache) parseResults(p *[]byte) ([]Type, error) {
 	switch c.c(p) {
-	case tokEOF, ',':
+	case tokEOF, ',', ')':
 		return nil, nil
 	case '(':
 		c.n(p)
@@ -425,6 +425,7 @@ more:
 }
 
 func (c TypeCache) parse(p *[]byte, id TypeID) (Type, error) {
+	//fmt.Printf("%q %q\n", *p, id)//TODO-
 	p0 := *p
 	tk := c.lex(p)
 	k := Union
@@ -523,7 +524,7 @@ func (c TypeCache) parse(p *[]byte, id TypeID) (Type, error) {
 		t := &StructOrUnionType{TypeBase: TypeBase{TypeKind: k}, Fields: l}
 		return t.setID(id, p0, p, c, t), nil
 	}
-	return nil, fmt.Errorf("unexpected %q", tk)
+	return nil, fmt.Errorf("unexpected %q (%q)", tk, p0)
 }
 
 // Type returns the type identified by id or an error, if any. If the cache has

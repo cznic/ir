@@ -14,6 +14,7 @@ var (
 	_ Value = (*AddressValue)(nil)
 	_ Value = (*CompositeValue)(nil)
 	_ Value = (*DesignatedValue)(nil)
+	_ Value = (*Float32Value)(nil)
 	_ Value = (*Float64Value)(nil)
 	_ Value = (*Int32Value)(nil)
 	_ Value = (*Int64Value)(nil)
@@ -77,6 +78,14 @@ type DesignatedValue struct {
 }
 
 func (v *DesignatedValue) String() string { return fmt.Sprintf("%v: %v", v.Index, v.Value) }
+
+// Float32Value is a declaration initializer constant of type float32.
+type Float32Value struct {
+	valuer
+	Value float32
+}
+
+func (v *Float32Value) String() string { return fmt.Sprint(v.Value) }
 
 // Float64Value is a declaration initializer constant of type float64.
 type Float64Value struct {

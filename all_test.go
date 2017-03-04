@@ -191,6 +191,7 @@ func TestParser(t *testing.T) {
 		"func()",
 		"func()(int32,int64)",
 		"func()int32",
+		"func(*float32,int32,*func(float64),*func(float32,float32))int32",
 		"func(...)",
 		"func(int8)",
 		"func(int8)(int32,int64)",
