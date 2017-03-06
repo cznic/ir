@@ -1309,10 +1309,15 @@ func (o *Panic) String() string {
 }
 
 // PostIncrement operation adds Delta to the value pointed to by address at TOS
-// and replaces TOS by the value pointee had before the increment.
+// and replaces TOS by the value pointee had before the increment. If Bits is
+// non zero then the actual pointee type is BitFieldType and the bit field of
+// type TypeID starts at bit BitOffset.
 type PostIncrement struct {
-	Delta  int
-	TypeID // Operand type.
+	BitFieldType TypeID
+	BitOffset    int
+	Bits         int
+	Delta        int
+	TypeID       // Operand type.
 	token.Position
 }
 
@@ -1335,28 +1340,43 @@ func (o *PostIncrement) verify(v *verifier) error {
 	}
 
 	t = t.(*PointerType).Element
-	switch t.Kind() {
-	case Array, Union, Struct, Function:
-		return fmt.Errorf("invalid operand type %s ", v.stack[n-1])
-	}
+	switch {
+	case o.Bits != 0:
+		if g, e := o.BitFieldType, t.ID(); g != e {
+			return fmt.Errorf("mismatched operand types %s and %s", g, e)
+		}
+	default:
+		switch t.Kind() {
+		case Array, Union, Struct, Function:
+			return fmt.Errorf("invalid operand type %s ", v.stack[n-1])
+		}
 
-	if g, e := o.TypeID, t.ID(); g != e {
-		return fmt.Errorf("mismatched operand types %s and %s", g, e)
+		if g, e := o.TypeID, t.ID(); g != e {
+			return fmt.Errorf("mismatched operand types %s and %s", g, e)
+		}
 	}
-
 	v.stack[n-1] = o.TypeID
 	return nil
 }
 
 func (o *PostIncrement) String() string {
-	return fmt.Sprintf("\t%-*s\t%v\t; %s", opw, o.TypeID.String()+"++", o.Delta, o.Position)
+	var s string
+	if o.Bits != 0 {
+		s = fmt.Sprintf(":%d@%d:%v", o.Bits, o.BitOffset, o.BitFieldType)
+	}
+	return fmt.Sprintf("\t%-*s\t%v\t; %s", opw, o.TypeID.String()+s+"++", o.Delta, o.Position)
 }
 
 // PreIncrement operation adds Delta to the value pointed to by address at TOS
-// and replaces TOS by the new value of the pointee.
+// and replaces TOS by the new value of the pointee. If Bits is non zero then
+// the actual pointee type is BitFieldType and the bit field of type TypeID
+// starts at bit BitOffset.
 type PreIncrement struct {
-	Delta  int
-	TypeID // Operand type.
+	BitFieldType TypeID
+	BitOffset    int
+	Bits         int
+	Delta        int
+	TypeID       // Operand type.
 	token.Position
 }
 
@@ -1379,13 +1399,20 @@ func (o *PreIncrement) verify(v *verifier) error {
 	}
 
 	t = t.(*PointerType).Element
-	switch t.Kind() {
-	case Array, Union, Struct, Function:
-		return fmt.Errorf("invalid operand type %s ", v.stack[n-1])
-	}
+	switch {
+	case o.Bits != 0:
+		if g, e := o.BitFieldType, t.ID(); g != e {
+			return fmt.Errorf("mismatched operand types %s and %s", g, e)
+		}
+	default:
+		switch t.Kind() {
+		case Array, Union, Struct, Function:
+			return fmt.Errorf("invalid operand type %s ", v.stack[n-1])
+		}
 
-	if g, e := o.TypeID, t.ID(); g != e {
-		return fmt.Errorf("mismatched operand types %s and %s", g, e)
+		if g, e := o.TypeID, t.ID(); g != e {
+			return fmt.Errorf("mismatched operand types %s and %s", g, e)
+		}
 	}
 
 	v.stack[n-1] = o.TypeID
@@ -1393,7 +1420,11 @@ func (o *PreIncrement) verify(v *verifier) error {
 }
 
 func (o *PreIncrement) String() string {
-	return fmt.Sprintf("\t%-*s\t%v\t; %s", opw, "++"+o.TypeID.String(), o.Delta, o.Position)
+	var s string
+	if o.Bits != 0 {
+		s = fmt.Sprintf(":%d@%d:%v", o.Bits, o.BitOffset, o.BitFieldType)
+	}
+	return fmt.Sprintf("\t%-*s%s\t%v\t; %s", opw, "++"+o.TypeID.String(), s, o.Delta, o.Position)
 }
 
 // PtrDiff operation subtracts the top stack item (b) and the previous one (a)

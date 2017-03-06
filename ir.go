@@ -400,8 +400,6 @@ func (v *verifier) assignable(a, b TypeID) bool {
 		if a == idVoidPtr || b == idVoidPtr || v.isVoidPtr(a) || v.isVoidPtr(b) {
 			return true
 		}
-
-		return v.xsign(t.(*PointerType).Element) == v.xsign(u.(*PointerType).Element)
 	}
 
 	return false
@@ -422,18 +420,4 @@ func (v *verifier) isVoidPtr(t TypeID) bool {
 		u = u.(*PointerType).Element
 	}
 	return false
-}
-
-func (v *verifier) xsign(t Type) TypeKind {
-	switch t.Kind() {
-	case Int8:
-		return Uint8
-	case Int16:
-		return Uint16
-	case Int32:
-		return Uint32
-	case Int64:
-		return Uint64
-	}
-	return t.Kind()
 }
