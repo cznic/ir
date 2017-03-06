@@ -398,6 +398,8 @@ func (l *linker) defineData(e extern, d *DataDefinition) (r int) {
 				f(v)
 			}
 		case
+			*Float32Value,
+			*Float64Value,
 			*Int32Value,
 			*Int64Value,
 			*StringValue:
