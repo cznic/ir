@@ -6,6 +6,7 @@ package ir
 
 import (
 	"fmt"
+	"go/token"
 )
 
 // LinkMain returns all objects transitively referenced from function _start or
@@ -176,6 +177,16 @@ func (l *linker) initializer(op *VariableDeclaration, v Value) {
 	}
 }
 
+func (l *linker) bitField(pos token.Position, ft, vt TypeID, bits, bitoff int) []Operation {
+	return []Operation{
+		&Convert{TypeID: ft, Result: vt, Position: pos},
+		&Const32{TypeID: idInt32, Value: int32(bitsize(vt) - bits - bitoff), Position: pos},
+		&Lsh{TypeID: vt, Position: pos},
+		&Const32{TypeID: idInt32, Value: int32(bitsize(vt) - bits), Position: pos},
+		&Rsh{TypeID: vt, Position: pos},
+	}
+}
+
 func (l *linker) expandBitfields(p *[]Operation) {
 	s := *p
 	var r []Operation
@@ -193,13 +204,7 @@ func (l *linker) expandBitfields(p *[]Operation) {
 			r = append(r, &Field{Index: x.Index, TypeID: x.TypeID, Position: x.Position})
 			st := l.typeCache.MustType(x.TypeID).(*PointerType).Element
 			ft := st.(*StructOrUnionType).Fields
-			if n := x.BitOffset; n != 0 {
-				r = append(r, &Const32{TypeID: idInt32, Value: int32(n), Position: x.Position})
-				r = append(r, &Rsh{TypeID: ft[x.Index].ID(), Position: x.Position})
-			}
-			r = append(r, &Const64{TypeID: ft[x.Index].ID(), Value: int64(1)<<uint(x.Bits) - 1, Position: x.Position})
-			r = append(r, &And{TypeID: ft[x.Index].ID(), Position: x.Position})
-			r = append(r, &Convert{TypeID: ft[x.Index].ID(), Result: x.BitFieldType, Position: x.Position})
+			r = append(r, l.bitField(x.Position, ft[x.Index].ID(), x.BitFieldType, x.Bits, x.BitOffset)...)
 			continue
 		case *Load:
 			if x.Bits == 0 {
@@ -207,13 +212,7 @@ func (l *linker) expandBitfields(p *[]Operation) {
 			}
 
 			r = append(r, &Load{TypeID: l.typeCache.MustType(x.BitFieldType).Pointer().ID(), Position: x.Position})
-			if n := x.BitOffset; n != 0 {
-				r = append(r, &Const32{TypeID: idInt32, Value: int32(n), Position: x.Position})
-				r = append(r, &Rsh{TypeID: x.BitFieldType, Position: x.Position})
-			}
-			r = append(r, &Const64{TypeID: x.BitFieldType, Value: int64(1)<<uint(x.Bits) - 1, Position: x.Position})
-			r = append(r, &And{TypeID: x.BitFieldType, Position: x.Position})
-			r = append(r, &Convert{TypeID: x.BitFieldType, Result: l.typeCache.MustType(x.TypeID).(*PointerType).Element.ID(), Position: x.Position})
+			r = append(r, l.bitField(x.Position, x.BitFieldType, l.typeCache.MustType(x.TypeID).(*PointerType).Element.ID(), x.Bits, x.BitOffset)...)
 			continue
 		}
 

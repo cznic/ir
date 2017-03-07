@@ -25,9 +25,16 @@ func init() {
 var (
 	dict = xc.Dict
 
+	idInt16    = TypeID(dict.SID("int16"))
 	idInt32    = TypeID(dict.SID("int32"))
+	idInt64    = TypeID(dict.SID("int64"))
+	idInt8     = TypeID(dict.SID("int8"))
 	idInt8Ptr  = TypeID(dict.SID("*int8"))
 	idStart    = dict.SID("_start")
+	idUint16   = TypeID(dict.SID("uint16"))
+	idUint32   = TypeID(dict.SID("uint32"))
+	idUint64   = TypeID(dict.SID("uint64"))
+	idUint8    = TypeID(dict.SID("uint8"))
 	idVoidPtr  = TypeID(dict.SID("*struct{}"))
 	idWcharPtr = TypeID(dict.SID("*int32"))
 
@@ -102,4 +109,28 @@ func addr(n bool) string {
 	}
 
 	return ""
+}
+
+func signed(t TypeID) bool {
+	switch t {
+	case idInt8, idInt16, idInt32, idInt64:
+		return true
+	}
+
+	return false
+}
+
+func bitsize(t TypeID) int {
+	switch t {
+	case idInt8, idUint8:
+		return 8
+	case idInt16, idUint16:
+		return 16
+	case idInt32, idUint32:
+		return 32
+	case idInt64, idUint64:
+		return 64
+	default:
+		panic("internal error")
+	}
 }
