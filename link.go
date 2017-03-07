@@ -197,7 +197,7 @@ func (l *linker) expandBitfields(p *[]Operation) {
 				r = append(r, &Const32{TypeID: idInt32, Value: int32(n), Position: x.Position})
 				r = append(r, &Rsh{TypeID: ft[x.Index].ID(), Position: x.Position})
 			}
-			r = append(r, &Const32{TypeID: ft[x.Index].ID(), Value: int32(1)<<uint(x.Bits) - 1, Position: x.Position})
+			r = append(r, &Const64{TypeID: ft[x.Index].ID(), Value: int64(1)<<uint(x.Bits) - 1, Position: x.Position})
 			r = append(r, &And{TypeID: ft[x.Index].ID(), Position: x.Position})
 			r = append(r, &Convert{TypeID: ft[x.Index].ID(), Result: x.BitFieldType, Position: x.Position})
 			continue
@@ -211,7 +211,7 @@ func (l *linker) expandBitfields(p *[]Operation) {
 				r = append(r, &Const32{TypeID: idInt32, Value: int32(n), Position: x.Position})
 				r = append(r, &Rsh{TypeID: x.BitFieldType, Position: x.Position})
 			}
-			r = append(r, &Const32{TypeID: x.BitFieldType, Value: int32(1)<<uint(x.Bits) - 1, Position: x.Position})
+			r = append(r, &Const64{TypeID: x.BitFieldType, Value: int64(1)<<uint(x.Bits) - 1, Position: x.Position})
 			r = append(r, &And{TypeID: x.BitFieldType, Position: x.Position})
 			r = append(r, &Convert{TypeID: x.BitFieldType, Result: l.typeCache.MustType(x.TypeID).(*PointerType).Element.ID(), Position: x.Position})
 			continue

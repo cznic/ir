@@ -61,6 +61,7 @@ var (
 	_ Operation = (*Store)(nil)
 	_ Operation = (*StringConst)(nil)
 	_ Operation = (*Sub)(nil)
+	_ Operation = (*TOS)(nil)
 	_ Operation = (*Variable)(nil)
 	_ Operation = (*VariableDeclaration)(nil)
 	_ Operation = (*Xor)(nil)
@@ -1713,6 +1714,42 @@ func (o *Sub) verify(v *verifier) error {
 
 func (o *Sub) String() string {
 	return fmt.Sprintf("\t%-*s\t%s\t; %s", opw, "sub", o.TypeID, o.Position)
+}
+
+// TOS pushes the address of the top of the evaluation stack.
+type TOS struct {
+	TypeID // Pointer type.
+	token.Position
+}
+
+// Pos implements Operation.
+func (o *TOS) Pos() token.Position { return o.Position }
+
+func (o *TOS) verify(v *verifier) error {
+	if o.TypeID == 0 {
+		return fmt.Errorf("missing type")
+	}
+
+	t := v.typeCache.MustType(o.TypeID)
+	if t.Kind() != Pointer {
+		return fmt.Errorf("pointer type expected, have %s", o.TypeID)
+	}
+
+	n := len(v.stack)
+	if n == 0 {
+		return fmt.Errorf("evaluation stack underflow")
+	}
+
+	if g, e := t.(*PointerType).Element.ID(), v.stack[n-1]; g != e {
+		return fmt.Errorf("expected type %s, have %s", e, g)
+	}
+
+	v.stack = append(v.stack, o.TypeID)
+	return nil
+}
+
+func (o *TOS) String() string {
+	return fmt.Sprintf("\t%-*s\tsp, %s\t; %s", opw, "push", o.TypeID, o.Position)
 }
 
 // Variable pushes a function local variable by index, or its address, to the
