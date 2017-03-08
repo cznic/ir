@@ -457,7 +457,7 @@ func (o *Convert) verify(v *verifier) error {
 		return fmt.Errorf("evaluation stack underflow")
 	}
 
-	if g, e := v.stack[n-1], o.TypeID; g != e {
+	if g, e := v.stack[n-1], o.TypeID; g != e && !v.assignable(g, e) {
 		return fmt.Errorf("mismatched types, got %s, expected %s", g, e)
 	}
 

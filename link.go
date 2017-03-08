@@ -7,6 +7,8 @@ package ir
 import (
 	"fmt"
 	"go/token"
+
+	"github.com/cznic/internal/buffer"
 )
 
 // LinkMain returns all objects transitively referenced from function _start or
@@ -116,7 +118,7 @@ func (l *linker) collectSymbols() {
 
 							if len(def.Body) == 1 {
 								if _, ok := def.Body[0].(*Panic); ok {
-									x = def
+									l.extern[x.NameID] = extern{unit: unit, index: i}
 									break
 								}
 							}
@@ -347,7 +349,17 @@ func (l *linker) defineFunc(e extern, f *FunctionDefinition) (r int) {
 				case ok:
 					x.Index = l.define(ex)
 				default:
-					panic(fmt.Errorf("%v: undefined %v", x.Position, x.NameID))
+					var buf buffer.Bytes
+					buf.Write(dict.S(idBuiltinPrefix))
+					buf.Write(dict.S(int(x.NameID)))
+					nm := NameID(dict.ID(buf.Bytes()))
+					buf.Close()
+					switch ex, ok := l.extern[nm]; {
+					case ok:
+						x.Index = l.define(ex)
+					default:
+						panic(fmt.Errorf("%v: undefined %v", x.Position, x.NameID))
+					}
 				}
 			case InternalLinkage:
 				switch ex, ok := l.intern[intern{x.NameID, e.unit}]; {

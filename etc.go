@@ -25,18 +25,19 @@ func init() {
 var (
 	dict = xc.Dict
 
-	idInt16    = TypeID(dict.SID("int16"))
-	idInt32    = TypeID(dict.SID("int32"))
-	idInt64    = TypeID(dict.SID("int64"))
-	idInt8     = TypeID(dict.SID("int8"))
-	idInt8Ptr  = TypeID(dict.SID("*int8"))
-	idStart    = dict.SID("_start")
-	idUint16   = TypeID(dict.SID("uint16"))
-	idUint32   = TypeID(dict.SID("uint32"))
-	idUint64   = TypeID(dict.SID("uint64"))
-	idUint8    = TypeID(dict.SID("uint8"))
-	idVoidPtr  = TypeID(dict.SID("*struct{}"))
-	idWcharPtr = TypeID(dict.SID("*int32"))
+	idBuiltinPrefix = dict.SID("__builtin_")
+	idInt16         = TypeID(dict.SID("int16"))
+	idInt32         = TypeID(dict.SID("int32"))
+	idInt64         = TypeID(dict.SID("int64"))
+	idInt8          = TypeID(dict.SID("int8"))
+	idInt8Ptr       = TypeID(dict.SID("*int8"))
+	idStart         = dict.SID("_start")
+	idUint16        = TypeID(dict.SID("uint16"))
+	idUint32        = TypeID(dict.SID("uint32"))
+	idUint64        = TypeID(dict.SID("uint64"))
+	idUint8         = TypeID(dict.SID("uint8"))
+	idVoidPtr       = TypeID(dict.SID("*struct{}"))
+	idWcharPtr      = TypeID(dict.SID("*int32"))
 
 	printHooks = strutil.PrettyPrintHooks{
 		reflect.TypeOf(NameID(0)): func(f strutil.Formatter, v interface{}, prefix, suffix string) {
