@@ -700,6 +700,9 @@ func (o *Element) String() string {
 
 // EndScope operation annotates leaving a block scope.
 type EndScope struct {
+	// Leaving the scope leaves a value on the evaluation stack. See
+	//  https://gcc.gnu.org/onlinedocs/gcc/Statement-Exprs.html
+	Value bool
 	token.Position
 }
 
@@ -707,7 +710,16 @@ type EndScope struct {
 func (o *EndScope) Pos() token.Position { return o.Position }
 
 func (o *EndScope) verify(v *verifier) error {
-	if len(v.stack) != 0 {
+	switch len(v.stack) {
+	case 0:
+		if o.Value {
+			return fmt.Errorf("empty evaluation stack at scope end")
+		}
+	case 1:
+		if !o.Value {
+			return fmt.Errorf("non empty evaluation stack at scope end")
+		}
+	default:
 		return fmt.Errorf("non empty evaluation stack at scope end")
 	}
 
