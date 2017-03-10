@@ -6,7 +6,6 @@ package ir
 
 import (
 	"fmt"
-	"go/token"
 
 	"github.com/cznic/internal/buffer"
 )
@@ -179,16 +178,6 @@ func (l *linker) initializer(op *VariableDeclaration, v Value) {
 	}
 }
 
-func (l *linker) bitField(pos token.Position, ft, vt TypeID, bits, bitoff int) []Operation {
-	return []Operation{
-		&Convert{TypeID: ft, Result: vt, Position: pos},
-		&Const32{TypeID: idInt32, Value: int32(bitsize(vt) - bits - bitoff), Position: pos},
-		&Lsh{TypeID: vt, Position: pos},
-		&Const32{TypeID: idInt32, Value: int32(bitsize(vt) - bits), Position: pos},
-		&Rsh{TypeID: vt, Position: pos},
-	}
-}
-
 func (l *linker) expandBitfields(p *[]Operation) {
 	s := *p
 	var r []Operation
@@ -203,18 +192,22 @@ func (l *linker) expandBitfields(p *[]Operation) {
 				panic("internal error")
 			}
 
-			r = append(r, &Field{Index: x.Index, TypeID: x.TypeID, Position: x.Position})
 			st := l.typeCache.MustType(x.TypeID).(*PointerType).Element
 			ft := st.(*StructOrUnionType).Fields
-			r = append(r, l.bitField(x.Position, ft[x.Index].ID(), x.BitFieldType, x.Bits, x.BitOffset)...)
+			r = append(r,
+				&Field{Index: x.Index, TypeID: x.TypeID, Position: x.Position},
+				&Convert{TypeID: ft[x.Index].ID(), Result: x.BitFieldType, Position: x.Position, Bits: x.Bits, BitOffset: x.BitOffset},
+			)
 			continue
 		case *Load:
 			if x.Bits == 0 {
 				break
 			}
 
-			r = append(r, &Load{TypeID: l.typeCache.MustType(x.BitFieldType).Pointer().ID(), Position: x.Position})
-			r = append(r, l.bitField(x.Position, x.BitFieldType, l.typeCache.MustType(x.TypeID).(*PointerType).Element.ID(), x.Bits, x.BitOffset)...)
+			r = append(r,
+				&Load{TypeID: l.typeCache.MustType(x.BitFieldType).Pointer().ID(), Position: x.Position},
+				&Convert{TypeID: x.BitFieldType, Result: l.typeCache.MustType(x.TypeID).(*PointerType).Element.ID(), Position: x.Position, Bits: x.Bits, BitOffset: x.BitOffset},
+			)
 			continue
 		}
 

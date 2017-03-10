@@ -112,13 +112,13 @@ func addr(n bool) string {
 	return ""
 }
 
-func signed(t TypeID) bool {
+func integer(t TypeID) bool {
 	switch t {
-	case idInt8, idInt16, idInt32, idInt64:
+	case idInt8, idUint8, idInt16, idUint16, idInt32, idUint32, idInt64, idUint64:
 		return true
+	default:
+		return false
 	}
-
-	return false
 }
 
 func bitsize(t TypeID) int {

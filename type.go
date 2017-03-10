@@ -45,10 +45,11 @@ var (
 //
 // Two types are identical if their type specifiers are equivalent.
 type Type interface {
-	Kind() TypeKind
-	ID() TypeID
 	Equal(Type) bool
+	ID() TypeID
+	Kind() TypeKind
 	Pointer() Type
+	Signed() bool
 }
 
 // TypeBase collects fields common to all types.
@@ -98,6 +99,16 @@ type TypeID int
 
 // Equal implements Type.
 func (t TypeID) Equal(u Type) bool { return t == u.ID() }
+
+// Signed implements Type.
+func (t TypeID) Signed() bool {
+	switch t {
+	case idInt8, idInt16, idInt32, idInt64:
+		return true
+	}
+
+	return false
+}
 
 // ID implements Type.
 func (t TypeID) ID() TypeID { return t }

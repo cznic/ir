@@ -443,10 +443,14 @@ func (o *Const64) String() string {
 	return fmt.Sprintf("\t%-*s\t%#x, %v\t; %s", opw, "const", o.Value, o.TypeID, o.Position)
 }
 
-// Convert operation converts TOS to the result type.
+// Convert operation converts TOS to the result type. If Bits != 0 then the
+// operand bit width is Bits and it starts at bit BitOffset and the resulting
+// value is sign extended if TypeID is a signed integer type.
 type Convert struct {
-	Result TypeID // Conversion type.
-	TypeID        // Operand type.
+	BitOffset int
+	Bits      int
+	Result    TypeID // Conversion type.
+	TypeID           // Operand type.
 	token.Position
 }
 
@@ -456,6 +460,10 @@ func (o *Convert) Pos() token.Position { return o.Position }
 func (o *Convert) verify(v *verifier) error {
 	if o.TypeID == 0 || o.Result == 0 {
 		return fmt.Errorf("missing type")
+	}
+
+	if o.Bits != 0 && !integer(o.TypeID) {
+		return fmt.Errorf("operand type must be integral")
 	}
 
 	n := len(v.stack)
@@ -472,7 +480,11 @@ func (o *Convert) verify(v *verifier) error {
 }
 
 func (o *Convert) String() string {
-	return fmt.Sprintf("\t%-*s\t%s, %s\t; %s", opw, "convert", o.TypeID, o.Result, o.Position)
+	var s string
+	if o.Bits != 0 {
+		s = fmt.Sprintf(":%d@%d", o.Bits, o.BitOffset)
+	}
+	return fmt.Sprintf("\t%-*s\t%s%s, %s\t; %s", opw, "convert", o.TypeID, s, o.Result, o.Position)
 }
 
 // Copy assigns source, which address is at TOS, to dest, which address is the
