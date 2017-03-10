@@ -206,6 +206,9 @@ func (o *Arguments) String() string {
 
 // BeginScope operation annotates entering a block scope.
 type BeginScope struct {
+	// Evaluation stack may be non-empty on entering the scope. See
+	// https://gcc.gnu.org/onlinedocs/gcc/Statement-Exprs.html
+	Value bool
 	token.Position
 }
 
@@ -213,7 +216,10 @@ type BeginScope struct {
 func (o *BeginScope) Pos() token.Position { return o.Position }
 
 func (o *BeginScope) verify(v *verifier) error {
-	if len(v.stack) != 0 {
+	if o.Value {
+		v.blockValueLevel++
+	}
+	if len(v.stack) != 0 && v.blockValueLevel == 0 {
 		return fmt.Errorf("non empty evaluation stack at scope begin")
 	}
 
@@ -700,8 +706,8 @@ func (o *Element) String() string {
 
 // EndScope operation annotates leaving a block scope.
 type EndScope struct {
-	// Leaving the scope leaves a value on the evaluation stack. See
-	//  https://gcc.gnu.org/onlinedocs/gcc/Statement-Exprs.html
+	// Leaving the scope may leave values on the evaluation stack. See
+	// https://gcc.gnu.org/onlinedocs/gcc/Statement-Exprs.html
 	Value bool
 	token.Position
 }
@@ -710,19 +716,13 @@ type EndScope struct {
 func (o *EndScope) Pos() token.Position { return o.Position }
 
 func (o *EndScope) verify(v *verifier) error {
-	switch len(v.stack) {
-	case 0:
-		if o.Value {
-			return fmt.Errorf("empty evaluation stack at scope end")
-		}
-	case 1:
-		if !o.Value {
-			return fmt.Errorf("non empty evaluation stack at scope end")
-		}
-	default:
+	if len(v.stack) != 0 && v.blockValueLevel == 0 {
 		return fmt.Errorf("non empty evaluation stack at scope end")
 	}
 
+	if o.Value {
+		v.blockValueLevel--
+	}
 	return nil
 }
 

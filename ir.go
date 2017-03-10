@@ -280,13 +280,14 @@ func (f *FunctionDefinition) Verify() (err error) {
 }
 
 type verifier struct {
-	blockLevel int
-	function   *FunctionDefinition
-	ip         int
-	labels     map[int]int
-	stack      []TypeID
-	typeCache  TypeCache
-	variables  []TypeID
+	blockLevel      int
+	blockValueLevel int
+	function        *FunctionDefinition
+	ip              int
+	labels          map[int]int
+	stack           []TypeID
+	typeCache       TypeCache
+	variables       []TypeID
 }
 
 func (v *verifier) validPtrBinop(a, b TypeID) bool {
