@@ -37,6 +37,7 @@ var (
 	_ Operation = (*Global)(nil)
 	_ Operation = (*Gt)(nil)
 	_ Operation = (*Jmp)(nil)
+	_ Operation = (*JmpP)(nil)
 	_ Operation = (*Jnz)(nil)
 	_ Operation = (*Jz)(nil)
 	_ Operation = (*Label)(nil)
@@ -964,6 +965,32 @@ func (o *Jmp) String() string {
 	}
 }
 
+// JmpP operation performs a branch to pointer at TOS.
+type JmpP struct {
+	token.Position
+}
+
+// Pos implements Operation.
+func (o *JmpP) Pos() token.Position { return o.Position }
+
+func (o *JmpP) verify(v *verifier) error {
+	n := len(v.stack)
+	if n != 1 {
+		return fmt.Errorf("evaluation stack must have exactly one item")
+	}
+
+	if g, e := v.stack[0], idVoidPtr; g != e {
+		return fmt.Errorf("invalid TOS type, expected %v, have %s", e, g)
+	}
+
+	v.stack = v.stack[:0]
+	return nil
+}
+
+func (o *JmpP) String() string {
+	return fmt.Sprintf("\t%-*s\t(sp)\t; %s", opw, "jmp", o.Position)
+}
+
 // Jnz operation performs a branch to a named or numbered label if the top of
 // the stack is non zero. The TOS type must be int32 and the operation removes
 // TOS.
@@ -1019,7 +1046,13 @@ type Label struct {
 // Pos implements Operation.
 func (o *Label) Pos() token.Position { return o.Position }
 
-func (o *Label) verify(v *verifier) error { return nil }
+func (o *Label) verify(v *verifier) error {
+	if o.NameID != 0 && len(v.stack) != 0 {
+		return fmt.Errorf("non empty evaluation stack at named label")
+	}
+
+	return nil
+}
 
 func (o *Label) String() string {
 	switch {

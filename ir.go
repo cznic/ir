@@ -67,6 +67,7 @@ func (t StringID) GobEncode() ([]byte, error) {
 type Object interface {
 	// Verify checks if the object is well-formed.
 	Verify() error
+	Base() *ObjectBase
 }
 
 // ObjectBase collects fields common to all objects.
@@ -87,6 +88,9 @@ func newObjectBase(p token.Position, nm, tnm NameID, typ TypeID, l Linkage) Obje
 		TypeName: tnm,
 	}
 }
+
+// Base implements Object.
+func (o *ObjectBase) Base() *ObjectBase { return o }
 
 // DataDefinition represents a variable definition and an optional initializer
 // value.
@@ -398,7 +402,39 @@ func (v *verifier) assignable(a, b TypeID) bool {
 	u := v.typeCache.MustType(b)
 
 	if t.Kind() == Pointer && u.Kind() == Pointer {
-		if a == idVoidPtr || b == idVoidPtr || v.isVoidPtr(a) || v.isVoidPtr(b) {
+		if v.isVoidPtr(a) || v.isVoidPtr(b) {
+			return true
+		}
+
+		t = t.(*PointerType).Element
+		u = u.(*PointerType).Element
+		if t.Kind() == Function && u.Kind() == Function {
+			a := t.(*FunctionType)
+			b := u.(*FunctionType)
+			at := a.Results
+			bt := b.Results
+			if len(at) != len(bt) {
+				return false
+			}
+
+			for i, r := range at {
+				if !v.assignable(r.ID(), bt[i].ID()) {
+					return false
+				}
+			}
+
+			at = a.Arguments
+			bt = b.Arguments
+			if len(at) != len(bt) {
+				return false
+			}
+
+			for i, r := range at {
+				if !v.assignable(r.ID(), bt[i].ID()) {
+					return false
+				}
+			}
+
 			return true
 		}
 	}

@@ -34,18 +34,30 @@ type Value interface {
 // AddressValue is a declaration initializer constant of type address. Its
 // final value is determined by the linker/loader.
 type AddressValue struct {
-	valuer
-	Index int // A negative value or object index as resolved by the linker.
+	// A negative value or object index as resolved by the linker.
+	Index int
+	Label NameID
 	Linkage
 	NameID
+	valuer
 }
 
 func (v *AddressValue) String() string {
 	switch v.Linkage {
 	case InternalLinkage:
-		return fmt.Sprintf("%v, &%v", v.Index, v.NameID)
+		switch {
+		case v.Label != 0:
+			return fmt.Sprintf("(%v, %v, &&%v)", v.Index, v.NameID, v.Label)
+		default:
+			return fmt.Sprintf("(%v, %v)", v.Index, v.NameID)
+		}
 	case ExternalLinkage:
-		return fmt.Sprintf("extern %v, &%v", v.Index, v.NameID)
+		switch {
+		case v.Label != 0:
+			return fmt.Sprintf("(%v, %v, &&%v)", v.Index, v.NameID, v.Label)
+		default:
+			return fmt.Sprintf("(extern %v, &%v)", v.Index, v.NameID)
+		}
 	default:
 		panic("internal error")
 	}

@@ -222,7 +222,7 @@ func (l *linker) unconvert(p *[]Operation) {
 	for _, v := range s {
 		switch x := v.(type) {
 		case *Convert:
-			if x.TypeID == x.Result {
+			if x.TypeID == x.Result && x.Bits == 0 {
 				continue
 			}
 		}
@@ -308,6 +308,7 @@ func (l *linker) defineFunc(e extern, f *FunctionDefinition) (r int) {
 			*Geq,
 			*Gt,
 			*Jmp,
+			*JmpP,
 			*Jnz,
 			*Jz,
 			*Label,
