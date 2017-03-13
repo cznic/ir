@@ -436,7 +436,6 @@ more:
 }
 
 func (c TypeCache) parse(p *[]byte, id TypeID) (Type, error) {
-	//fmt.Printf("%q %q\n", *p, id)//TODO-
 	p0 := *p
 	tk := c.lex(p)
 	k := Union

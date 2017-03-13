@@ -120,18 +120,3 @@ func integer(t TypeID) bool {
 		return false
 	}
 }
-
-func bitsize(t TypeID) int {
-	switch t {
-	case idInt8, idUint8:
-		return 8
-	case idInt16, idUint16:
-		return 16
-	case idInt32, idUint32:
-		return 32
-	case idInt64, idUint64:
-		return 64
-	default:
-		panic("internal error")
-	}
-}
