@@ -403,6 +403,8 @@ func (l *linker) defineData(e extern, d *DataDefinition) (r int) {
 				f(v)
 			}
 		case
+			*Complex128Value,
+			*Complex64Value,
 			*Float32Value,
 			*Float64Value,
 			*Int32Value,

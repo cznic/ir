@@ -12,6 +12,8 @@ import (
 
 var (
 	_ Value = (*AddressValue)(nil)
+	_ Value = (*Complex128Value)(nil)
+	_ Value = (*Complex64Value)(nil)
 	_ Value = (*CompositeValue)(nil)
 	_ Value = (*DesignatedValue)(nil)
 	_ Value = (*Float32Value)(nil)
@@ -62,6 +64,22 @@ func (v *AddressValue) String() string {
 		panic("internal error")
 	}
 }
+
+// Complex64Value is a declaration initializer constant of type complex64.
+type Complex64Value struct {
+	valuer
+	Value complex64
+}
+
+func (v *Complex64Value) String() string { return fmt.Sprint(v.Value) }
+
+// Complex128Value is a declaration initializer constant of type complex128.
+type Complex128Value struct {
+	valuer
+	Value complex128
+}
+
+func (v *Complex128Value) String() string { return fmt.Sprint(v.Value) }
 
 // CompositeValue represents a constant array/struct initializer.
 type CompositeValue struct {
