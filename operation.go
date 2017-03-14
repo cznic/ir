@@ -310,6 +310,9 @@ func (o *Call) verify(v *verifier) error {
 
 		if g, e := val, args[i].ID(); g != e && !v.assignable(g, e) {
 			u := v.typeCache.MustType(e)
+			if u.Kind() == Pointer {
+				u = u.(*PointerType).Element
+			}
 			ok := u.Kind() == Array && g == u.(*ArrayType).Item.Pointer().ID()
 			if !ok {
 				return fmt.Errorf("invalid argument #%v type, got %v, expected %s", i, g, e)
@@ -383,6 +386,9 @@ func (o *CallFP) verify(v *verifier) error {
 
 		if g, e := val, args[i].ID(); g != e && !v.assignable(g, e) {
 			u := v.typeCache.MustType(e)
+			if u.Kind() == Pointer {
+				u = u.(*PointerType).Element
+			}
 			ok := u.Kind() == Array && g == u.(*ArrayType).Item.Pointer().ID()
 			if !ok {
 				return fmt.Errorf("invalid argument #%v type, got %v, expected %s", i, g, e)
@@ -979,7 +985,11 @@ func (o *JmpP) verify(v *verifier) error {
 		return fmt.Errorf("evaluation stack must have exactly one item")
 	}
 
-	if g, e := v.stack[0], idVoidPtr; g != e {
+	g := v.typeCache.MustType(v.stack[0])
+	for g.Kind() == Pointer {
+		g = g.(*PointerType).Element
+	}
+	if g, e := g.ID(), idVoid; g != e {
 		return fmt.Errorf("invalid TOS type, expected %v, have %s", e, g)
 	}
 

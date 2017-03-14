@@ -36,6 +36,7 @@ var (
 	idUint32        = TypeID(dict.SID("uint32"))
 	idUint64        = TypeID(dict.SID("uint64"))
 	idUint8         = TypeID(dict.SID("uint8"))
+	idVoid          = TypeID(dict.SID("struct{}"))
 	idVoidPtr       = TypeID(dict.SID("*struct{}"))
 	idWcharPtr      = TypeID(dict.SID("*int32"))
 
