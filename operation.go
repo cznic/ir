@@ -524,7 +524,7 @@ func (o *Copy) verify(v *verifier) error {
 	}
 
 	if g, e := v.stack[n-1], t.ID(); g != e && g != idVoidPtr {
-		return fmt.Errorf("mismatched source ype, got %s, expected %s", g, e)
+		return fmt.Errorf("mismatched source type, got %s, expected %s", g, e)
 	}
 
 	v.stack = v.stack[:n-1]
@@ -1734,8 +1734,8 @@ func (o *Store) String() string {
 
 // StringConst operation pushes a string literal on the evaluation stack.
 type StringConst struct {
-	Value StringID
-	Wide  bool // Element is wchar_t.
+	Value  StringID
+	TypeID // Type of the pointer to the string literal.
 	token.Position
 }
 
@@ -1743,22 +1743,16 @@ type StringConst struct {
 func (o *StringConst) Pos() token.Position { return o.Position }
 
 func (o *StringConst) verify(v *verifier) error {
-	switch {
-	case o.Wide:
-		v.stack = append(v.stack, idWcharPtr)
-	default:
-		v.stack = append(v.stack, idInt8Ptr)
+	if o.TypeID == 0 {
+		return fmt.Errorf("missing type")
 	}
+
+	v.stack = append(v.stack, o.TypeID)
 	return nil
 }
 
 func (o *StringConst) String() string {
-	switch {
-	case o.Wide:
-		return fmt.Sprintf("\t%-*s\t%q, %s\t; %s", opw, "const", o.Value, dict.S(int(idWcharPtr)), o.Position)
-	default:
-		return fmt.Sprintf("\t%-*s\t%q, %s\t; %s", opw, "const", o.Value, dict.S(int(idInt8Ptr)), o.Position)
-	}
+	return fmt.Sprintf("\t%-*s\t%q, %s\t; %s", opw, "const", o.Value, o.TypeID, o.Position)
 }
 
 // Sub operation subtracts the top stack item (b) and the previous one (a) and
