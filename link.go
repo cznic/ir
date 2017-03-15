@@ -360,7 +360,7 @@ func (l *linker) defineFunc(e extern, f *FunctionDefinition) (r int) {
 				case ok:
 					x.Index = l.define(extern{e.unit, ex})
 				default:
-					panic("TODO")
+					panic(fmt.Errorf("%v: undefined %v", x.Position, x.NameID))
 				}
 			default:
 				panic("internal error")

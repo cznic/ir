@@ -1533,7 +1533,7 @@ func (o *PtrDiff) verify(v *verifier) error {
 }
 
 func (o *PtrDiff) String() string {
-	return fmt.Sprintf("\t%-*s\t%s\t; %s", opw, "ptrDiff", o.TypeID, o.Position)
+	return fmt.Sprintf("\t%-*s\t%s, %s\t; %s", opw, "ptrDiff", o.PtrType, o.TypeID, o.Position)
 }
 
 // Rem operation divides the top stack item (b) and the previous one (a) and

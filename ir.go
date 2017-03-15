@@ -423,18 +423,6 @@ func (v *verifier) assignable(a, b TypeID) bool {
 				}
 			}
 
-			at = a.Arguments
-			bt = b.Arguments
-			if len(at) != len(bt) {
-				return false
-			}
-
-			for i, r := range at {
-				if !v.assignable(r.ID(), bt[i].ID()) {
-					return false
-				}
-			}
-
 			return true
 		}
 	}
