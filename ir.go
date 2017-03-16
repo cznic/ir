@@ -65,7 +65,9 @@ func (t StringID) GobEncode() ([]byte, error) {
 
 // Object represents a declarations or definitions of static data and functions.
 type Object interface {
-	// Verify checks if the object is well-formed.
+	// Verify checks if the object is well-formed. Verify may mutate the
+	// object. For example, Verify may remove provably unreachable code of
+	// a FunctionDefinition.Body.
 	Verify() error
 	Base() *ObjectBase
 }
@@ -141,6 +143,7 @@ func (f *FunctionDefinition) Verify() (err error) {
 		return fmt.Errorf("invalid operation")
 	}
 
+	unconvert(&f.Body)
 	v := &verifier{
 		function:  f,
 		labels:    map[int]int{},
@@ -164,7 +167,7 @@ func (f *FunctionDefinition) Verify() (err error) {
 			}
 
 		case *Label:
-			n := int(x.NameID)
+			n := -int(x.NameID)
 			if n == 0 {
 				n = x.Number
 			}
@@ -186,6 +189,7 @@ func (f *FunctionDefinition) Verify() (err error) {
 		return fmt.Errorf("unbalanced BeginScope/EndScope")
 	}
 
+	computedGotos := false
 	for ip, op := range f.Body {
 		var nm NameID
 		var num int
@@ -196,11 +200,14 @@ func (f *FunctionDefinition) Verify() (err error) {
 			nm, num = x.NameID, x.Number
 		case *Jz:
 			nm, num = x.NameID, x.Number
+		case *JmpP:
+			computedGotos = true
+			continue
 		default:
 			continue
 		}
 
-		n := int(nm)
+		n := -int(nm)
 		if n == 0 {
 			n = num
 		}
@@ -210,7 +217,7 @@ func (f *FunctionDefinition) Verify() (err error) {
 	}
 
 	p := buffer.CGet(len(f.Body))
-	visited := *p
+	ipFlags := *p
 
 	defer buffer.Put(p)
 
@@ -220,7 +227,7 @@ func (f *FunctionDefinition) Verify() (err error) {
 		for {
 			//fmt.Printf("# %#05x %v ; %v\n", ip, stack, f.Body[ip].Pos())
 			op := f.Body[ip]
-			if visited[ip] != 0 {
+			if ipFlags[ip] != 0 {
 				switch ex, ok := phi[ip]; {
 				case ok:
 					if g, e := len(stack), len(ex); g != e {
@@ -239,7 +246,7 @@ func (f *FunctionDefinition) Verify() (err error) {
 				}
 			}
 
-			visited[ip] = 1
+			ipFlags[ip] = 1
 
 			v.ip = ip
 			v.stack = stack
@@ -248,27 +255,56 @@ func (f *FunctionDefinition) Verify() (err error) {
 			}
 
 			stack = v.stack
+		outer:
 			switch x := f.Body[ip].(type) {
 			case *Jmp:
-				n := int(x.NameID)
+				n := -int(x.NameID)
 				if n == 0 {
 					n = x.Number
 				}
 				ip = v.labels[n]
 				continue
 			case *Jnz:
-				n := int(x.NameID)
+				n := -int(x.NameID)
 				if n == 0 {
 					n = x.Number
 				}
+				if y, ok := f.Body[ip-1].(*Const32); ok {
+					switch {
+					case y.Value != 0: // Always taken.
+						ipFlags[ip-1] = 0
+						f.Body[ip] = &Jmp{NameID: x.NameID, Number: x.Number, Position: x.Position}
+						ip = v.labels[n]
+						continue
+					default: // Never taken.
+						ipFlags[ip-1] = 0
+						ipFlags[ip] = 0
+						break outer
+					}
+				}
+
 				if err := g(v.labels[n], append([]TypeID(nil), stack...)); err != nil {
 					return err
 				}
 			case *Jz:
-				n := int(x.NameID)
+				n := -int(x.NameID)
 				if n == 0 {
 					n = x.Number
 				}
+				if y, ok := f.Body[ip-1].(*Const32); ok {
+					switch {
+					case y.Value == 0: // Always taken.
+						ipFlags[ip-1] = 0
+						f.Body[ip] = &Jmp{NameID: x.NameID, Number: x.Number, Position: x.Position}
+						ip = v.labels[n]
+						continue
+					default: // Never taken.
+						ipFlags[ip-1] = 0
+						ipFlags[ip] = 0
+						break outer
+					}
+				}
+
 				if err := g(v.labels[n], append([]TypeID(nil), stack...)); err != nil {
 					return err
 				}
@@ -280,7 +316,37 @@ func (f *FunctionDefinition) Verify() (err error) {
 			ip++
 		}
 	}
-	return g(0, nil)
+	if err := g(0, nil); err != nil {
+		return err
+	}
+
+	if computedGotos {
+		for k, v := range v.labels {
+			if k >= 0 {
+				continue
+			}
+
+			if err := g(v, phi[v]); err != nil {
+				return err
+			}
+		}
+	}
+
+	w := 0
+	for ip, op := range f.Body {
+		switch op.(type) {
+		case *BeginScope, *EndScope, *VariableDeclaration, *Return:
+			// nop
+		default:
+			if ipFlags[ip] == 0 {
+				continue
+			}
+		}
+		f.Body[w] = op
+		w++
+	}
+	f.Body = f.Body[:w]
+	return nil
 }
 
 type verifier struct {
@@ -288,7 +354,7 @@ type verifier struct {
 	blockValueLevel int
 	function        *FunctionDefinition
 	ip              int
-	labels          map[int]int
+	labels          map[int]int // nm (<0) or num (>=0): ip
 	stack           []TypeID
 	typeCache       TypeCache
 	variables       []TypeID

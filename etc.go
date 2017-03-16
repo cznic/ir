@@ -121,3 +121,20 @@ func integer(t TypeID) bool {
 		return false
 	}
 }
+
+func unconvert(p *[]Operation) {
+	s := *p
+	w := 0
+	for _, v := range s {
+		switch x := v.(type) {
+		case *Convert:
+			if x.TypeID == x.Result && x.Bits == 0 {
+				continue
+			}
+		}
+
+		s[w] = v
+		w++
+	}
+	*p = s[:w]
+}

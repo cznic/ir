@@ -216,23 +216,6 @@ func (l *linker) expandBitfields(p *[]Operation) {
 	*p = r
 }
 
-func (l *linker) unconvert(p *[]Operation) {
-	s := *p
-	w := 0
-	for _, v := range s {
-		switch x := v.(type) {
-		case *Convert:
-			if x.TypeID == x.Result && x.Bits == 0 {
-				continue
-			}
-		}
-
-		s[w] = v
-		w++
-	}
-	*p = s[:w]
-}
-
 func (l *linker) checkCalls(p *[]Operation) {
 	s := *p
 	w := 0
@@ -280,7 +263,7 @@ func (l *linker) defineFunc(e extern, f *FunctionDefinition) (r int) {
 	l.defined[e] = r
 	l.out = append(l.out, f)
 	l.expandBitfields(&f.Body)
-	l.unconvert(&f.Body)
+	unconvert(&f.Body)
 	for ip, v := range f.Body {
 		switch x := v.(type) {
 		case
