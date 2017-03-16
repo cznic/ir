@@ -23,6 +23,7 @@ var (
 	_ Operation = (*CallFP)(nil)
 	_ Operation = (*Const32)(nil)
 	_ Operation = (*Const64)(nil)
+	_ Operation = (*ConstC128)(nil)
 	_ Operation = (*Convert)(nil)
 	_ Operation = (*Copy)(nil)
 	_ Operation = (*Cpl)(nil)
@@ -33,6 +34,7 @@ var (
 	_ Operation = (*EndScope)(nil)
 	_ Operation = (*Eq)(nil)
 	_ Operation = (*Field)(nil)
+	_ Operation = (*FieldValue)(nil)
 	_ Operation = (*Geq)(nil)
 	_ Operation = (*Global)(nil)
 	_ Operation = (*Gt)(nil)
@@ -62,7 +64,6 @@ var (
 	_ Operation = (*Store)(nil)
 	_ Operation = (*StringConst)(nil)
 	_ Operation = (*Sub)(nil)
-	_ Operation = (*TOS)(nil)
 	_ Operation = (*Variable)(nil)
 	_ Operation = (*VariableDeclaration)(nil)
 	_ Operation = (*Xor)(nil)
@@ -404,7 +405,7 @@ func (o *CallFP) String() string {
 	return fmt.Sprintf("\t%-*s\t%v, %s\t; %s", opw, "callfp", o.Arguments, o.TypeID, o.Position)
 }
 
-// Const32 operation pushes a 32 bit literal on the evaluation stack.
+// Const32 operation pushes a 32 bit value on the evaluation stack.
 type Const32 struct {
 	TypeID
 	Value int32
@@ -427,7 +428,7 @@ func (o *Const32) String() string {
 	return fmt.Sprintf("\t%-*s\t%#x, %v\t; %s", opw, "const", o.Value, o.TypeID, o.Position)
 }
 
-// Const64 operation pushes a 64 bit literal on the evaluation stack.
+// Const64 operation pushes a 64 bit value on the evaluation stack.
 type Const64 struct {
 	TypeID
 	Value int64
@@ -447,6 +448,29 @@ func (o *Const64) verify(v *verifier) error {
 }
 
 func (o *Const64) String() string {
+	return fmt.Sprintf("\t%-*s\t%#x, %v\t; %s", opw, "const", o.Value, o.TypeID, o.Position)
+}
+
+// ConstC128 operation pushes a complex128 value on the evaluation stack.
+type ConstC128 struct {
+	TypeID
+	Value complex128
+	token.Position
+}
+
+// Pos implements Operation.
+func (o *ConstC128) Pos() token.Position { return o.Position }
+
+func (o *ConstC128) verify(v *verifier) error {
+	if o.TypeID == 0 {
+		return fmt.Errorf("missing type")
+	}
+
+	v.stack = append(v.stack, o.TypeID)
+	return nil
+}
+
+func (o *ConstC128) String() string {
 	return fmt.Sprintf("\t%-*s\t%#x, %v\t; %s", opw, "const", o.Value, o.TypeID, o.Position)
 }
 
@@ -860,6 +884,48 @@ func (o *Field) String() string {
 	default:
 		return fmt.Sprintf("\t%-*s\t#%v, %v%s\t; %s", opw, "field", o.Index, o.TypeID, s, o.Position)
 	}
+}
+
+// FieldValue replaces a struct/union at TOS with its field by index.
+type FieldValue struct {
+	Index  int
+	TypeID // Struct/union type.
+	token.Position
+}
+
+// Pos implements Operation.
+func (o *FieldValue) Pos() token.Position { return o.Position }
+
+func (o *FieldValue) verify(v *verifier) error {
+	if o.TypeID == 0 {
+		return fmt.Errorf("missing type")
+	}
+
+	t := v.typeCache.MustType(o.TypeID)
+	if t.Kind() != Struct && t.Kind() != Union {
+		return fmt.Errorf("expected struct/union type, have '%s'", t)
+	}
+
+	n := len(v.stack)
+	if n == 0 {
+		return fmt.Errorf("evaluation stack underflow")
+	}
+
+	if g, e := o.TypeID, v.stack[n-1]; g != e {
+		return fmt.Errorf("mismatched types, got %s, expected %s", g, e)
+	}
+
+	st := t.(*StructOrUnionType)
+	if o.Index >= len(st.Fields) {
+		return fmt.Errorf("invalid index")
+	}
+
+	v.stack[n-1] = st.Fields[o.Index].ID()
+	return nil
+}
+
+func (o *FieldValue) String() string {
+	return fmt.Sprintf("\t%-*s\t#%v, %v\t; %s", opw, "fieldvalue", o.Index, o.TypeID, o.Position)
 }
 
 // Geq operation compares the top stack item (b) and the previous one (a) and
@@ -1732,10 +1798,10 @@ func (o *Store) String() string {
 	return fmt.Sprintf("\t%-*s\t%s%s\t; %s", opw, "store", o.TypeID, s, o.Position)
 }
 
-// StringConst operation pushes a string literal on the evaluation stack.
+// StringConst operation pushes a string value on the evaluation stack.
 type StringConst struct {
 	Value  StringID
-	TypeID // Type of the pointer to the string literal.
+	TypeID // Type of the pointer to the string value.
 	token.Position
 }
 
@@ -1775,42 +1841,6 @@ func (o *Sub) verify(v *verifier) error {
 
 func (o *Sub) String() string {
 	return fmt.Sprintf("\t%-*s\t%s\t; %s", opw, "sub", o.TypeID, o.Position)
-}
-
-// TOS pushes the address of the top of the evaluation stack.
-type TOS struct {
-	TypeID // Pointer type.
-	token.Position
-}
-
-// Pos implements Operation.
-func (o *TOS) Pos() token.Position { return o.Position }
-
-func (o *TOS) verify(v *verifier) error {
-	if o.TypeID == 0 {
-		return fmt.Errorf("missing type")
-	}
-
-	t := v.typeCache.MustType(o.TypeID)
-	if t.Kind() != Pointer {
-		return fmt.Errorf("pointer type expected, have %s", o.TypeID)
-	}
-
-	n := len(v.stack)
-	if n == 0 {
-		return fmt.Errorf("evaluation stack underflow")
-	}
-
-	if g, e := t.(*PointerType).Element.ID(), v.stack[n-1]; g != e {
-		return fmt.Errorf("expected type %s, have %s", e, g)
-	}
-
-	v.stack = append(v.stack, o.TypeID)
-	return nil
-}
-
-func (o *TOS) String() string {
-	return fmt.Sprintf("\t%-*s\tsp, %s\t; %s", opw, "push", o.TypeID, o.Position)
 }
 
 // Variable pushes a function local variable by index, or its address, to the
