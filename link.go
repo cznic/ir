@@ -150,6 +150,7 @@ func (l *linker) collectSymbols() {
 func (l *linker) initializer(op *VariableDeclaration, v Value) {
 	switch x := v.(type) {
 	case
+		*Complex128Value,
 		*Float32Value,
 		*Float64Value,
 		*Int32Value,
