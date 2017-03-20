@@ -311,10 +311,10 @@ func TestAlignSize(t *testing.T) {
 		{"struct{int32,struct{},int32}", 4, 8},
 		{"struct{int64,int8}", 8, 16},
 		{"struct{int64}", 8, 8},
-		{"struct{}", 0, 0},
+		{"struct{}", 1, 0},
 		{"union{int64,int8}", 8, 8},
 		{"union{int64}", 8, 8},
-		{"union{}", 0, 0},
+		{"union{}", 1, 0},
 	} {
 		typ, err := types.Type(TypeID(dict.SID(v.src)))
 		if err != nil {

@@ -156,6 +156,7 @@ func (l *linker) initializer(op *VariableDeclaration, v Value) {
 		*Int32Value,
 		*Int64Value,
 		*StringValue,
+		*WideStringValue,
 		nil:
 		// ok
 	case *AddressValue:
@@ -395,7 +396,8 @@ func (l *linker) defineData(e extern, d *DataDefinition) (r int) {
 			*Float64Value,
 			*Int32Value,
 			*Int64Value,
-			*StringValue:
+			*StringValue,
+			*WideStringValue:
 			// ok, nop.
 		default:
 			panic(fmt.Errorf("%v.%v: internal error: %T", e.unit, e.index, x))

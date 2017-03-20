@@ -21,6 +21,7 @@ var (
 	_ Value = (*Int32Value)(nil)
 	_ Value = (*Int64Value)(nil)
 	_ Value = (*StringValue)(nil)
+	_ Value = (*WideStringValue)(nil)
 )
 
 type valuer struct{}
@@ -148,3 +149,11 @@ type StringValue struct {
 }
 
 func (v *StringValue) String() string { return fmt.Sprintf("%q", v.StringID) }
+
+// WideStringValue is a declaration initializer constant of type wide string.
+type WideStringValue struct {
+	valuer
+	Value []rune
+}
+
+func (v *WideStringValue) String() string { return fmt.Sprintf("%q", string(v.Value)) }

@@ -6,6 +6,8 @@ package ir
 
 import (
 	"fmt"
+
+	"github.com/cznic/mathutil"
 )
 
 var (
@@ -85,7 +87,7 @@ type MemoryModelItem struct {
 func (m MemoryModel) Alignof(t Type) int {
 	switch x := t.(type) {
 	case *ArrayType:
-		return m.Alignof(x.Item)
+		return mathutil.Max(1, m.Alignof(x.Item))
 	case *StructOrUnionType:
 		var r int
 		for _, v := range x.Fields {
@@ -93,7 +95,7 @@ func (m MemoryModel) Alignof(t Type) int {
 				r = a
 			}
 		}
-		return r
+		return mathutil.Max(1, r)
 	default:
 		item, ok := m[t.Kind()]
 		if !ok {
