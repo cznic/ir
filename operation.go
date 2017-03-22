@@ -425,7 +425,7 @@ func (o *Const32) verify(v *verifier) error {
 }
 
 func (o *Const32) String() string {
-	return fmt.Sprintf("\t%-*s\t%#x, %v\t; %s", opw, "const", o.Value, o.TypeID, o.Position)
+	return fmt.Sprintf("\t%-*s\t%#x, %v\t; %s", opw, "const", uint32(o.Value), o.TypeID, o.Position)
 }
 
 // Const64 operation pushes a 64 bit value on the evaluation stack.
@@ -448,7 +448,7 @@ func (o *Const64) verify(v *verifier) error {
 }
 
 func (o *Const64) String() string {
-	return fmt.Sprintf("\t%-*s\t%#x, %v\t; %s", opw, "const", o.Value, o.TypeID, o.Position)
+	return fmt.Sprintf("\t%-*s\t%#x, %v\t; %s", opw, "const", uint64(o.Value), o.TypeID, o.Position)
 }
 
 // ConstC128 operation pushes a complex128 value on the evaluation stack.
