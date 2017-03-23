@@ -113,9 +113,18 @@ func addr(n bool) string {
 	return ""
 }
 
-func integer(t TypeID) bool {
+func isInteger(t TypeID) bool {
 	switch t {
 	case idInt8, idUint8, idInt16, idUint16, idInt32, idUint32, idInt64, idUint64:
+		return true
+	default:
+		return false
+	}
+}
+
+func isSignedInteger(t TypeID) bool {
+	switch t {
+	case idInt8, idInt16, idInt32, idInt64:
 		return true
 	default:
 		return false
@@ -137,4 +146,27 @@ func unconvert(p *[]Operation) {
 		w++
 	}
 	*p = s[:w]
+}
+
+func unsigned(t TypeID) TypeID {
+	switch t {
+	case idInt8:
+		return idUint8
+	case idUint8:
+		return t
+	case idInt16:
+		return idUint16
+	case idUint16:
+		return t
+	case idInt32:
+		return idUint32
+	case idUint32:
+		return t
+	case idInt64:
+		return idUint64
+	case idUint64:
+		return t
+	default:
+		panic(fmt.Errorf("internal error %v", t))
+	}
 }

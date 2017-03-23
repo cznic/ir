@@ -493,7 +493,7 @@ func (o *Convert) verify(v *verifier) error {
 		return fmt.Errorf("missing type")
 	}
 
-	if o.Bits != 0 && !integer(o.TypeID) {
+	if o.Bits != 0 && !isInteger(o.TypeID) {
 		return fmt.Errorf("operand type must be integral")
 	}
 
@@ -1773,16 +1773,17 @@ func (o *Store) verify(v *verifier) error {
 		return fmt.Errorf("expected pointer and value at TOS, got %s and %s (%v)", tid, v.stack[p+1], v.stack)
 	}
 
+	g := o.TypeID
 	switch {
 	case o.Bits != 0:
-		// nop
+		g = o.BitFieldType
 	default:
 		if g, e := pt.(*PointerType).Element.ID(), v.stack[p+1]; !v.assignable(g, e) {
 			return fmt.Errorf("mismatched address and value type: %s and %s", g, e)
 		}
 	}
 
-	if g, e := o.TypeID, v.stack[p+1]; !v.assignable(g, e) {
+	if e := v.stack[p+1]; !v.assignable(g, e) {
 		return fmt.Errorf("mismatched address and value type: %s and %s", g, e)
 	}
 

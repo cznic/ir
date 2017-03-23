@@ -196,20 +196,42 @@ func (l *linker) expandBitfields(p *[]Operation) {
 
 			st := l.typeCache.MustType(x.TypeID).(*PointerType).Element
 			ft := st.(*StructOrUnionType).Fields
-			r = append(r,
-				&Field{Index: x.Index, TypeID: x.TypeID, Position: x.Position},
-				&Convert{TypeID: ft[x.Index].ID(), Result: x.BitFieldType, Position: x.Position, Bits: x.Bits, BitOffset: x.BitOffset},
-			)
+			from := ft[x.Index].ID()
+			to := x.BitFieldType
+			switch {
+			case isSignedInteger(from) && !isSignedInteger(to):
+				r = append(r,
+					&Field{Index: x.Index, TypeID: x.TypeID, Position: x.Position},
+					&Convert{TypeID: from, Result: unsigned(from), Position: x.Position},
+					&Convert{TypeID: unsigned(from), Result: to, Position: x.Position, Bits: x.Bits, BitOffset: x.BitOffset},
+				)
+			default:
+				r = append(r,
+					&Field{Index: x.Index, TypeID: x.TypeID, Position: x.Position},
+					&Convert{TypeID: from, Result: to, Position: x.Position, Bits: x.Bits, BitOffset: x.BitOffset},
+				)
+			}
 			continue
 		case *Load:
 			if x.Bits == 0 {
 				break
 			}
 
-			r = append(r,
-				&Load{TypeID: l.typeCache.MustType(x.BitFieldType).Pointer().ID(), Position: x.Position},
-				&Convert{TypeID: x.BitFieldType, Result: l.typeCache.MustType(x.TypeID).(*PointerType).Element.ID(), Position: x.Position, Bits: x.Bits, BitOffset: x.BitOffset},
-			)
+			from := x.BitFieldType
+			to := l.typeCache.MustType(x.TypeID).(*PointerType).Element.ID()
+			switch {
+			case isSignedInteger(from) && !isSignedInteger(to):
+				r = append(r,
+					&Load{TypeID: l.typeCache.MustType(x.BitFieldType).Pointer().ID(), Position: x.Position},
+					&Convert{TypeID: from, Result: unsigned(from), Position: x.Position},
+					&Convert{TypeID: unsigned(from), Result: to, Position: x.Position, Bits: x.Bits, BitOffset: x.BitOffset},
+				)
+			default:
+				r = append(r,
+					&Load{TypeID: l.typeCache.MustType(x.BitFieldType).Pointer().ID(), Position: x.Position},
+					&Convert{TypeID: from, Result: to, Position: x.Position, Bits: x.Bits, BitOffset: x.BitOffset},
+				)
+			}
 			continue
 		}
 
