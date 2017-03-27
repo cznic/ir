@@ -137,7 +137,7 @@ func unconvert(p *[]Operation) {
 	for _, v := range s {
 		switch x := v.(type) {
 		case *Convert:
-			if x.TypeID == x.Result && x.Bits == 0 {
+			if x.TypeID == x.Result {
 				continue
 			}
 		}

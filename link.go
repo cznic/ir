@@ -180,66 +180,6 @@ func (l *linker) initializer(op *VariableDeclaration, v Value) {
 	}
 }
 
-func (l *linker) expandBitfields(p *[]Operation) {
-	s := *p
-	var r []Operation
-	for _, v := range s {
-		switch x := v.(type) {
-		case *Field:
-			if x.Bits == 0 {
-				break
-			}
-
-			if x.Address {
-				panic("internal error")
-			}
-
-			st := l.typeCache.MustType(x.TypeID).(*PointerType).Element
-			ft := st.(*StructOrUnionType).Fields
-			from := ft[x.Index].ID()
-			to := x.BitFieldType
-			switch {
-			case isSignedInteger(from) && !isSignedInteger(to):
-				r = append(r,
-					&Field{Index: x.Index, TypeID: x.TypeID, Position: x.Position},
-					&Convert{TypeID: from, Result: unsigned(from), Position: x.Position},
-					&Convert{TypeID: unsigned(from), Result: to, Position: x.Position, Bits: x.Bits, BitOffset: x.BitOffset},
-				)
-			default:
-				r = append(r,
-					&Field{Index: x.Index, TypeID: x.TypeID, Position: x.Position},
-					&Convert{TypeID: from, Result: to, Position: x.Position, Bits: x.Bits, BitOffset: x.BitOffset},
-				)
-			}
-			continue
-		case *Load:
-			if x.Bits == 0 {
-				break
-			}
-
-			from := x.BitFieldType
-			to := l.typeCache.MustType(x.TypeID).(*PointerType).Element.ID()
-			switch {
-			case isSignedInteger(from) && !isSignedInteger(to):
-				r = append(r,
-					&Load{TypeID: l.typeCache.MustType(x.BitFieldType).Pointer().ID(), Position: x.Position},
-					&Convert{TypeID: from, Result: unsigned(from), Position: x.Position},
-					&Convert{TypeID: unsigned(from), Result: to, Position: x.Position, Bits: x.Bits, BitOffset: x.BitOffset},
-				)
-			default:
-				r = append(r,
-					&Load{TypeID: l.typeCache.MustType(x.BitFieldType).Pointer().ID(), Position: x.Position},
-					&Convert{TypeID: from, Result: to, Position: x.Position, Bits: x.Bits, BitOffset: x.BitOffset},
-				)
-			}
-			continue
-		}
-
-		r = append(r, v)
-	}
-	*p = r
-}
-
 func (l *linker) checkCalls(p *[]Operation) {
 	s := *p
 	w := 0
@@ -286,7 +226,6 @@ func (l *linker) defineFunc(e extern, f *FunctionDefinition) (r int) {
 	r = len(l.out)
 	l.defined[e] = r
 	l.out = append(l.out, f)
-	l.expandBitfields(&f.Body)
 	unconvert(&f.Body)
 	for ip, v := range f.Body {
 		switch x := v.(type) {

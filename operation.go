@@ -474,14 +474,10 @@ func (o *ConstC128) String() string {
 	return fmt.Sprintf("\t%-*s\t%#x, %v\t; %s", opw, "const", o.Value, o.TypeID, o.Position)
 }
 
-// Convert operation converts TOS to the result type. If Bits != 0 then the
-// operand bit width is Bits and it starts at bit BitOffset and the resulting
-// value is sign extended if TypeID is a signed integer type.
+// Convert operation converts TOS to the result type.
 type Convert struct {
-	BitOffset int
-	Bits      int
-	Result    TypeID // Conversion type.
-	TypeID           // Operand type.
+	Result TypeID // Conversion type.
+	TypeID        // Operand type.
 	token.Position
 }
 
@@ -491,10 +487,6 @@ func (o *Convert) Pos() token.Position { return o.Position }
 func (o *Convert) verify(v *verifier) error {
 	if o.TypeID == 0 || o.Result == 0 {
 		return fmt.Errorf("missing type")
-	}
-
-	if o.Bits != 0 && !isInteger(o.TypeID) {
-		return fmt.Errorf("operand type must be integral")
 	}
 
 	n := len(v.stack)
@@ -511,11 +503,7 @@ func (o *Convert) verify(v *verifier) error {
 }
 
 func (o *Convert) String() string {
-	var s string
-	if o.Bits != 0 {
-		s = fmt.Sprintf(":%d@%d", o.Bits, o.BitOffset)
-	}
-	return fmt.Sprintf("\t%-*s\t%s%s, %s\t; %s", opw, "convert", o.TypeID, s, o.Result, o.Position)
+	return fmt.Sprintf("\t%-*s\t%s, %s\t; %s", opw, "convert", o.TypeID, o.Result, o.Position)
 }
 
 // Copy assigns source, which address is at TOS, to dest, which address is the
@@ -797,17 +785,11 @@ func (o *Eq) String() string {
 }
 
 // Field replaces a struct/union pointer at TOS with its field by index, or its
-// address.  If Bits is non zero then the effective field type is BitFieldType
-// and it starts at bit BitOffset. Bits cannot be non zero if Address is set.
-//
-// Linker expands this operation such that resulting Bits are always zero.
+// address.
 type Field struct {
-	Address      bool
-	BitFieldType TypeID
-	BitOffset    int
-	Bits         int
-	Index        int
-	TypeID       // Pointer to a struct/union.
+	Address bool
+	Index   int
+	TypeID  // Pointer to a struct/union.
 	token.Position
 }
 
@@ -817,14 +799,6 @@ func (o *Field) Pos() token.Position { return o.Position }
 func (o *Field) verify(v *verifier) error {
 	if o.TypeID == 0 {
 		return fmt.Errorf("missing type")
-	}
-
-	if o.Bits != 0 && o.BitFieldType == 0 {
-		return fmt.Errorf("missing type")
-	}
-
-	if o.Bits != 0 && o.Address {
-		return fmt.Errorf("bit fields are not addressable")
 	}
 
 	n := len(v.stack)
@@ -851,38 +825,25 @@ func (o *Field) verify(v *verifier) error {
 		return fmt.Errorf("invalid index")
 	}
 
-	switch {
-	case o.Bits != 0:
-		if o.Address {
-			return fmt.Errorf("bit fields are not addressable")
+	t = st.Fields[o.Index]
+	if o.Address {
+		switch t.Kind() {
+		case Array:
+			t = t.(*ArrayType).Item.Pointer()
+		default:
+			t = t.Pointer()
 		}
-
-		v.stack[n-1] = o.BitFieldType
-	default:
-		t = st.Fields[o.Index]
-		if o.Address {
-			switch t.Kind() {
-			case Array:
-				t = t.(*ArrayType).Item.Pointer()
-			default:
-				t = t.Pointer()
-			}
-		}
-		v.stack[n-1] = t.ID()
 	}
+	v.stack[n-1] = t.ID()
 	return nil
 }
 
 func (o *Field) String() string {
-	var s string
-	if o.Bits != 0 {
-		s = fmt.Sprintf(":%d@%d:%v", o.Bits, o.BitOffset, o.BitFieldType)
-	}
 	switch {
 	case o.Address:
-		return fmt.Sprintf("\t%-*s\t&#%v, %v%s\t; %s", opw, "field", o.Index, o.TypeID, s, o.Position)
+		return fmt.Sprintf("\t%-*s\t&#%v, %v\t; %s", opw, "field", o.Index, o.TypeID, o.Position)
 	default:
-		return fmt.Sprintf("\t%-*s\t#%v, %v%s\t; %s", opw, "field", o.Index, o.TypeID, s, o.Position)
+		return fmt.Sprintf("\t%-*s\t#%v, %v\t; %s", opw, "field", o.Index, o.TypeID, o.Position)
 	}
 }
 
@@ -1162,16 +1123,9 @@ func (o *Leq) String() string {
 	return fmt.Sprintf("\t%-*s\t%s\t; %s", opw, "leq", o.TypeID, o.Position)
 }
 
-// Load replaces a pointer at TOS by its pointee. If Bits is non zero then the
-// actual pointee type is BitFieldType and the bit field of type *TypeID starts
-// at bit BitOffset.
-//
-// Linker expands this operation such that resulting Bits are always zero.
+// Load replaces a pointer at TOS by its pointee.
 type Load struct {
-	BitFieldType TypeID
-	BitOffset    int
-	Bits         int
-	TypeID       // Pointer type.
+	TypeID // Pointer type.
 	token.Position
 }
 
@@ -1183,20 +1137,12 @@ func (o *Load) verify(v *verifier) error {
 		return fmt.Errorf("missing type")
 	}
 
-	if o.Bits != 0 && o.BitFieldType == 0 {
-		return fmt.Errorf("missing type")
-	}
-
 	n := len(v.stack)
 	if n == 0 {
 		return fmt.Errorf("evaluation stack underflow")
 	}
 
-	g := o.TypeID
-	if o.BitFieldType != 0 {
-		g = v.typeCache.MustType(o.BitFieldType).Pointer().ID()
-	}
-	if e := v.stack[n-1]; g != e {
+	if g, e := o.TypeID, v.stack[n-1]; g != e {
 		return fmt.Errorf("mismatched types, got %s, expected %s", g, e)
 	}
 
@@ -1210,11 +1156,7 @@ func (o *Load) verify(v *verifier) error {
 }
 
 func (o *Load) String() string {
-	var s string
-	if o.Bits != 0 {
-		s = fmt.Sprintf(":%d@%d:%v", o.Bits, o.BitOffset, o.BitFieldType)
-	}
-	return fmt.Sprintf("\t%-*s\t%s%s\t; %s", opw, "load", o.TypeID, s, o.Position)
+	return fmt.Sprintf("\t%-*s\t%s\t; %s", opw, "load", o.TypeID, o.Position)
 }
 
 // Lsh operation uses the top stack item (b), which must be an int32, and the
@@ -1444,8 +1386,8 @@ func (o *Panic) String() string {
 
 // PostIncrement operation adds Delta to the value pointed to by address at TOS
 // and replaces TOS by the value pointee had before the increment. If Bits is
-// non zero then the actual pointee type is BitFieldType and the bit field of
-// type TypeID starts at bit BitOffset.
+// non zero then the effective operand type is BitFieldType and the bit field
+// starts at bit BitOffset.
 type PostIncrement struct {
 	BitFieldType TypeID
 	BitOffset    int
@@ -1474,22 +1416,20 @@ func (o *PostIncrement) verify(v *verifier) error {
 	}
 
 	t = t.(*PointerType).Element
+	switch t.Kind() {
+	case Array, Union, Struct, Function:
+		return fmt.Errorf("invalid operand type %s ", v.stack[n-1])
+	}
+
+	if g, e := o.TypeID, t.ID(); g != e {
+		return fmt.Errorf("mismatched operand types %s and %s", g, e)
+	}
 	switch {
 	case o.Bits != 0:
-		if g, e := o.BitFieldType, t.ID(); g != e {
-			return fmt.Errorf("mismatched operand types %s and %s", g, e)
-		}
+		v.stack[n-1] = o.BitFieldType
 	default:
-		switch t.Kind() {
-		case Array, Union, Struct, Function:
-			return fmt.Errorf("invalid operand type %s ", v.stack[n-1])
-		}
-
-		if g, e := o.TypeID, t.ID(); g != e {
-			return fmt.Errorf("mismatched operand types %s and %s", g, e)
-		}
+		v.stack[n-1] = o.TypeID
 	}
-	v.stack[n-1] = o.TypeID
 	return nil
 }
 
@@ -1503,8 +1443,8 @@ func (o *PostIncrement) String() string {
 
 // PreIncrement operation adds Delta to the value pointed to by address at TOS
 // and replaces TOS by the new value of the pointee. If Bits is non zero then
-// the actual pointee type is BitFieldType and the bit field of type TypeID
-// starts at bit BitOffset.
+// the effective operand type is BitFieldType and the bit field starts at bit
+// BitOffset.
 type PreIncrement struct {
 	BitFieldType TypeID
 	BitOffset    int
@@ -1533,23 +1473,21 @@ func (o *PreIncrement) verify(v *verifier) error {
 	}
 
 	t = t.(*PointerType).Element
-	switch {
-	case o.Bits != 0:
-		if g, e := o.BitFieldType, t.ID(); g != e {
-			return fmt.Errorf("mismatched operand types %s and %s", g, e)
-		}
-	default:
-		switch t.Kind() {
-		case Array, Union, Struct, Function:
-			return fmt.Errorf("invalid operand type %s ", v.stack[n-1])
-		}
-
-		if g, e := o.TypeID, t.ID(); g != e {
-			return fmt.Errorf("mismatched operand types %s and %s", g, e)
-		}
+	switch t.Kind() {
+	case Array, Union, Struct, Function:
+		return fmt.Errorf("invalid operand type %s ", v.stack[n-1])
 	}
 
-	v.stack[n-1] = o.TypeID
+	if g, e := o.TypeID, t.ID(); g != e {
+		return fmt.Errorf("mismatched operand types %s and %s", g, e)
+	}
+
+	switch {
+	case o.Bits != 0:
+		v.stack[n-1] = o.BitFieldType
+	default:
+		v.stack[n-1] = o.TypeID
+	}
 	return nil
 }
 
@@ -1738,15 +1676,11 @@ func (o *Rsh) String() string {
 
 // Store operation stores a TOS value at address in the preceding stack
 // position.  The address is removed from the evaluation stack.  If Bits is non
-// zero then the actual pointee type is BitFieldType and the bit field of
-// effective type TypeID starts at bit BitOffset.
-//
-// Linker rewrites this operation such that resulting Bits are always zero.
+// zero then the destination is a bit field starting at bit BitOffset.
 type Store struct {
-	BitFieldType TypeID
-	BitOffset    int
-	Bits         int
-	TypeID       // Type of the value.
+	BitOffset int
+	Bits      int
+	TypeID    // Type of the value.
 	token.Position
 }
 
@@ -1755,10 +1689,6 @@ func (o *Store) Pos() token.Position { return o.Position }
 
 func (o *Store) verify(v *verifier) error {
 	if o.TypeID == 0 {
-		return fmt.Errorf("missing type")
-	}
-
-	if o.Bits != 0 && o.BitFieldType == 0 {
 		return fmt.Errorf("missing type")
 	}
 
@@ -1773,18 +1703,8 @@ func (o *Store) verify(v *verifier) error {
 		return fmt.Errorf("expected pointer and value at TOS, got %s and %s (%v)", tid, v.stack[p+1], v.stack)
 	}
 
-	g := o.TypeID
-	switch {
-	case o.Bits != 0:
-		g = o.BitFieldType
-	default:
-		if g, e := pt.(*PointerType).Element.ID(), v.stack[p+1]; !v.assignable(g, e) {
-			return fmt.Errorf("mismatched address and value type: %s and %s", g, e)
-		}
-	}
-
-	if e := v.stack[p+1]; !v.assignable(g, e) {
-		return fmt.Errorf("mismatched address and value type: %s and %s", g, e)
+	if g, e := pt.(*PointerType).Element.ID(), v.stack[p+1]; !v.assignable(g, e) {
+		return fmt.Errorf("mismatched operand types: %s and %s", g, e)
 	}
 
 	v.stack = append(v.stack[:p], v.stack[p+1])
@@ -1794,7 +1714,7 @@ func (o *Store) verify(v *verifier) error {
 func (o *Store) String() string {
 	var s string
 	if o.Bits != 0 {
-		s = fmt.Sprintf(":%d@%d:%v", o.Bits, o.BitOffset, o.BitFieldType)
+		s = fmt.Sprintf(":%d@%d", o.Bits, o.BitOffset)
 	}
 	return fmt.Sprintf("\t%-*s\t%s%s\t; %s", opw, "store", o.TypeID, s, o.Position)
 }
