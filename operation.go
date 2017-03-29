@@ -471,7 +471,7 @@ func (o *ConstC128) verify(v *verifier) error {
 }
 
 func (o *ConstC128) String() string {
-	return fmt.Sprintf("\t%-*s\t%#x, %v\t; %s", opw, "const", o.Value, o.TypeID, o.Position)
+	return fmt.Sprintf("\t%-*s\t%v, %v\t; %s", opw, "const", o.Value, o.TypeID, o.Position)
 }
 
 // Convert operation converts TOS to the result type.

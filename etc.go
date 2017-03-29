@@ -30,15 +30,9 @@ var (
 	idInt32         = TypeID(dict.SID("int32"))
 	idInt64         = TypeID(dict.SID("int64"))
 	idInt8          = TypeID(dict.SID("int8"))
-	idInt8Ptr       = TypeID(dict.SID("*int8"))
 	idStart         = dict.SID("_start")
-	idUint16        = TypeID(dict.SID("uint16"))
-	idUint32        = TypeID(dict.SID("uint32"))
-	idUint64        = TypeID(dict.SID("uint64"))
-	idUint8         = TypeID(dict.SID("uint8"))
 	idVoid          = TypeID(dict.SID("struct{}"))
 	idVoidPtr       = TypeID(dict.SID("*struct{}"))
-	idWcharPtr      = TypeID(dict.SID("*int32"))
 
 	printHooks = strutil.PrettyPrintHooks{
 		reflect.TypeOf(NameID(0)): func(f strutil.Formatter, v interface{}, prefix, suffix string) {
@@ -113,24 +107,6 @@ func addr(n bool) string {
 	return ""
 }
 
-func isInteger(t TypeID) bool {
-	switch t {
-	case idInt8, idUint8, idInt16, idUint16, idInt32, idUint32, idInt64, idUint64:
-		return true
-	default:
-		return false
-	}
-}
-
-func isSignedInteger(t TypeID) bool {
-	switch t {
-	case idInt8, idInt16, idInt32, idInt64:
-		return true
-	default:
-		return false
-	}
-}
-
 func unconvert(p *[]Operation) {
 	s := *p
 	w := 0
@@ -146,27 +122,4 @@ func unconvert(p *[]Operation) {
 		w++
 	}
 	*p = s[:w]
-}
-
-func unsigned(t TypeID) TypeID {
-	switch t {
-	case idInt8:
-		return idUint8
-	case idUint8:
-		return t
-	case idInt16:
-		return idUint16
-	case idUint16:
-		return t
-	case idInt32:
-		return idUint32
-	case idUint32:
-		return t
-	case idInt64:
-		return idUint64
-	case idUint64:
-		return t
-	default:
-		panic(fmt.Errorf("internal error %v", t))
-	}
 }
