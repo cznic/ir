@@ -21,6 +21,7 @@ var (
 	_ Operation = (*Bool)(nil)
 	_ Operation = (*Call)(nil)
 	_ Operation = (*CallFP)(nil)
+	_ Operation = (*Const)(nil)
 	_ Operation = (*Const32)(nil)
 	_ Operation = (*Const64)(nil)
 	_ Operation = (*ConstC128)(nil)
@@ -403,6 +404,29 @@ func (o *CallFP) verify(v *verifier) error {
 
 func (o *CallFP) String() string {
 	return fmt.Sprintf("\t%-*s\t%v, %s\t; %s", opw, "callfp", o.Arguments, o.TypeID, o.Position)
+}
+
+// Const operation pushes a constant value on the evaluation stack.
+type Const struct {
+	TypeID
+	Value Value
+	token.Position
+}
+
+// Pos implements Operation.
+func (o *Const) Pos() token.Position { return o.Position }
+
+func (o *Const) verify(v *verifier) error {
+	if o.TypeID == 0 {
+		return fmt.Errorf("missing type")
+	}
+
+	v.stack = append(v.stack, o.TypeID)
+	return nil
+}
+
+func (o *Const) String() string {
+	return fmt.Sprintf("\t%-*s\t%v, %v\t; %s", opw, "const", o.Value, o.TypeID, o.Position)
 }
 
 // Const32 operation pushes a 32 bit value on the evaluation stack.

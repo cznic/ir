@@ -284,6 +284,30 @@ func (l *linker) defineFunc(e extern, f *FunctionDefinition) (r int) {
 			*Variable,
 			*Xor:
 			// nop
+		case *Const:
+			switch v := x.Value.(type) {
+			case *AddressValue:
+				switch v.Linkage {
+				case ExternalLinkage:
+					switch ex, ok := l.extern[v.NameID]; {
+					case ok:
+						v.Index = l.define(ex)
+					default:
+						panic("TODO")
+					}
+				case InternalLinkage:
+					switch ex, ok := l.intern[intern{v.NameID, e.unit}]; {
+					case ok:
+						v.Index = l.define(extern{unit: e.unit, index: ex})
+					default:
+						panic("TODO")
+					}
+				default:
+					panic("internal error")
+				}
+			default:
+				panic(fmt.Errorf("%s: %T", x.Position, v))
+			}
 		case *Global:
 			switch x.Linkage {
 			case ExternalLinkage:
