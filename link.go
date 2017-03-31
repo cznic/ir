@@ -342,7 +342,12 @@ func (l *linker) defineData(e extern, d *DataDefinition) (r int) {
 					panic("TODO")
 				}
 			case InternalLinkage:
-				panic("TODO")
+				switch ex, ok := l.intern[intern{x.NameID, e.unit}]; {
+				case ok:
+					x.Index = l.define(extern{unit: e.unit, index: ex})
+				default:
+					panic("TODO")
+				}
 			default:
 				panic("internal error")
 			}
