@@ -42,6 +42,7 @@ type AddressValue struct {
 	Label NameID
 	Linkage
 	NameID
+	Offset uintptr
 	valuer
 }
 
@@ -50,16 +51,16 @@ func (v *AddressValue) String() string {
 	case InternalLinkage:
 		switch {
 		case v.Label != 0:
-			return fmt.Sprintf("(%v, %v, &&%v)", v.Index, v.NameID, v.Label)
+			return fmt.Sprintf("(%v, %v, &&%v+%v)", v.Index, v.NameID, v.Label)
 		default:
-			return fmt.Sprintf("(%v, %v)", v.Index, v.NameID)
+			return fmt.Sprintf("(%v, %v+%v)", v.Index, v.NameID, v.Offset)
 		}
 	case ExternalLinkage:
 		switch {
 		case v.Label != 0:
 			return fmt.Sprintf("(%v, %v, &&%v)", v.Index, v.NameID, v.Label)
 		default:
-			return fmt.Sprintf("(extern %v, &%v)", v.Index, v.NameID)
+			return fmt.Sprintf("(extern %v, &%v+%v)", v.Index, v.NameID, v.Offset)
 		}
 	default:
 		panic("internal error")
@@ -144,11 +145,12 @@ func (v *Int64Value) String() string { return fmt.Sprint(v.Value) }
 
 // StringValue is a declaration initializer constant of type string.
 type StringValue struct {
-	valuer
+	Offset uintptr
 	StringID
+	valuer
 }
 
-func (v *StringValue) String() string { return fmt.Sprintf("%q", v.StringID) }
+func (v *StringValue) String() string { return fmt.Sprintf("%q+%v", v.StringID, v.Offset) }
 
 // WideStringValue is a declaration initializer constant of type wide string.
 type WideStringValue struct {

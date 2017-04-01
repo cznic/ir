@@ -370,7 +370,15 @@ func (l *linker) defineData(e extern, d *DataDefinition) (r int) {
 				case ok:
 					x.Index = l.define(extern{unit: e.unit, index: ex})
 				default:
-					panic("TODO")
+					switch {
+					case Testing:
+						for k, v := range l.intern {
+							fmt.Printf("%q: %v\n", k.NameID, v)
+						}
+						fallthrough
+					default:
+						panic(fmt.Errorf("%s: undefined %q", d.Position, x.NameID))
+					}
 				}
 			default:
 				panic("internal error")
