@@ -11,8 +11,7 @@ import (
 )
 
 var (
-	// MemoryModels are predefined, R/O memory models.
-	MemoryModels = map[string]MemoryModel{
+	memoryModels = map[string]MemoryModel{
 		"32": {
 			Int8:  MemoryModelItem{Align: 1, Size: 1, StructAlign: 1},
 			Int16: MemoryModelItem{Align: 2, Size: 2, StructAlign: 2},
@@ -31,6 +30,28 @@ var (
 			Complex64:  MemoryModelItem{Align: 4, Size: 8, StructAlign: 4},
 			Complex128: MemoryModelItem{Align: 4, Size: 16, StructAlign: 4},
 			Complex256: MemoryModelItem{Align: 4, Size: 32, StructAlign: 4},
+
+			Pointer:  MemoryModelItem{Align: 4, Size: 4, StructAlign: 4},
+			Function: MemoryModelItem{Align: 4, Size: 4, StructAlign: 4},
+		},
+		"48": {
+			Int8:  MemoryModelItem{Align: 1, Size: 1, StructAlign: 1},
+			Int16: MemoryModelItem{Align: 2, Size: 2, StructAlign: 2},
+			Int32: MemoryModelItem{Align: 4, Size: 4, StructAlign: 4},
+			Int64: MemoryModelItem{Align: 8, Size: 8, StructAlign: 8},
+
+			Uint8:  MemoryModelItem{Align: 1, Size: 1, StructAlign: 1},
+			Uint16: MemoryModelItem{Align: 2, Size: 2, StructAlign: 2},
+			Uint32: MemoryModelItem{Align: 4, Size: 4, StructAlign: 4},
+			Uint64: MemoryModelItem{Align: 8, Size: 8, StructAlign: 8},
+
+			Float32:  MemoryModelItem{Align: 4, Size: 4, StructAlign: 4},
+			Float64:  MemoryModelItem{Align: 8, Size: 8, StructAlign: 8},
+			Float128: MemoryModelItem{Align: 8, Size: 16, StructAlign: 8},
+
+			Complex64:  MemoryModelItem{Align: 8, Size: 8, StructAlign: 8},
+			Complex128: MemoryModelItem{Align: 8, Size: 16, StructAlign: 8},
+			Complex256: MemoryModelItem{Align: 8, Size: 32, StructAlign: 8},
 
 			Pointer:  MemoryModelItem{Align: 4, Size: 4, StructAlign: 4},
 			Function: MemoryModelItem{Align: 4, Size: 4, StructAlign: 4},
@@ -58,7 +79,39 @@ var (
 			Function: MemoryModelItem{Align: 8, Size: 8, StructAlign: 8},
 		},
 	}
+
+	// MemoryModels are predefined, R/O memory models.
+	MemoryModels = map[string]MemoryModel{
+		"386":         memoryModels["32"],
+		"amd64":       memoryModels["64"],
+		"amd64p32":    memoryModels["48"],
+		"arm":         memoryModels["32"],
+		"arm64":       memoryModels["64"],
+		"arm64be":     memoryModels["32"],
+		"armbe":       memoryModels["32"],
+		"mips":        memoryModels["32"],
+		"mips64":      memoryModels["64"],
+		"mips64le":    memoryModels["64"],
+		"mips64p32":   memoryModels["48"],
+		"mips64p32le": memoryModels["48"],
+		"mipsle":      memoryModels["32"],
+		"ppc":         memoryModels["32"],
+		"ppc64":       memoryModels["64"],
+		"ppc64le":     memoryModels["32"],
+		"s390":        memoryModels["32"],
+		"s390x":       memoryModels["32"],
+		"sparc":       memoryModels["32"],
+		"sparc64":     memoryModels["64"],
+	}
 )
+
+func init() {
+	for k, v := range MemoryModels {
+		if v == nil {
+			panic(k)
+		}
+	}
+}
 
 func roundup(n, to int64) int64 {
 	if r := n % to; r != 0 {
