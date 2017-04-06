@@ -368,7 +368,7 @@ func (c TypeCache) parseTypeList(p *[]byte) ([]Type, error) {
 
 func (c TypeCache) parseResults(p *[]byte) ([]Type, error) {
 	switch c.c(p) {
-	case tokEOF, ',', ')':
+	case tokEOF, ',', ')', '}':
 		return nil, nil
 	case '(':
 		c.n(p)
