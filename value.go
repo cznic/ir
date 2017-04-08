@@ -51,14 +51,14 @@ func (v *AddressValue) String() string {
 	case InternalLinkage:
 		switch {
 		case v.Label != 0:
-			return fmt.Sprintf("(%v, %v, &&%v+%v)", v.Index, v.NameID, v.Label)
+			return fmt.Sprintf("(%v, %v, &&%v+%v)", v.Index, v.NameID, v.Label, v.Offset)
 		default:
 			return fmt.Sprintf("(%v, %v+%v)", v.Index, v.NameID, v.Offset)
 		}
 	case ExternalLinkage:
 		switch {
 		case v.Label != 0:
-			return fmt.Sprintf("(%v, %v, &&%v)", v.Index, v.NameID, v.Label)
+			return fmt.Sprintf("(%v, %v, &&%v+%v)", v.Index, v.NameID, v.Label, v.Offset)
 		default:
 			return fmt.Sprintf("(extern %v, &%v+%v)", v.Index, v.NameID, v.Offset)
 		}
