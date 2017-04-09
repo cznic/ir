@@ -122,7 +122,7 @@ func (l *linker) collectSymbols() {
 								}
 							}
 
-							panic(fmt.Errorf("internal error %T", def))
+							panic(fmt.Errorf("%s: internal error %s", x.Position, x.NameID))
 						default:
 							panic(fmt.Errorf("internal error %T", def))
 						}
@@ -363,7 +363,7 @@ func (l *linker) defineData(e extern, d *DataDefinition) (r int) {
 				case ok:
 					x.Index = l.define(ex)
 				default:
-					panic("TODO")
+					panic(fmt.Errorf("%s: undefined %q", d.Position, x.NameID))
 				}
 			case InternalLinkage:
 				switch ex, ok := l.intern[intern{x.NameID, e.unit}]; {

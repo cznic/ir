@@ -1166,7 +1166,7 @@ func (o *Load) verify(v *verifier) error {
 		return fmt.Errorf("evaluation stack underflow")
 	}
 
-	if g, e := o.TypeID, v.stack[n-1]; g != e {
+	if g, e := o.TypeID, v.stack[n-1]; g != e && !v.assignable(g, e) {
 		return fmt.Errorf("mismatched types, got %s, expected %s", g, e)
 	}
 
@@ -1445,7 +1445,7 @@ func (o *PostIncrement) verify(v *verifier) error {
 		return fmt.Errorf("invalid operand type %s ", v.stack[n-1])
 	}
 
-	if g, e := o.TypeID, t.ID(); g != e {
+	if g, e := o.TypeID, t.ID(); g != e && !v.assignable(g, e) {
 		return fmt.Errorf("mismatched operand types %s and %s", g, e)
 	}
 	switch {
@@ -1502,7 +1502,7 @@ func (o *PreIncrement) verify(v *verifier) error {
 		return fmt.Errorf("invalid operand type %s ", v.stack[n-1])
 	}
 
-	if g, e := o.TypeID, t.ID(); g != e {
+	if g, e := o.TypeID, t.ID(); g != e && !v.assignable(g, e) {
 		return fmt.Errorf("mismatched operand types %s and %s", g, e)
 	}
 
@@ -1552,7 +1552,7 @@ func (o *PtrDiff) verify(v *verifier) error {
 		return fmt.Errorf("pointer type required, have %s", g)
 	}
 
-	if g, e := v.stack[n-2], v.stack[n-1]; g != e {
+	if g, e := v.stack[n-2], v.stack[n-1]; g != e && !v.assignable(g, e) {
 		return fmt.Errorf("mismatched operand types %s and %s", g, e)
 	}
 

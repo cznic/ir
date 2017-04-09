@@ -144,25 +144,25 @@ func (f *FunctionDefinition) Verify() (err error) {
 	}
 
 	unconvert(&f.Body)
-	v := &verifier{
+	ver := &verifier{
 		function:  f,
 		labels:    map[int]int{},
 		typeCache: TypeCache{},
 	}
 	var op Operation
-	for v.ip, op = range f.Body {
+	for ver.ip, op = range f.Body {
 		switch x := op.(type) {
 		case *BeginScope:
-			v.blockLevel++
+			ver.blockLevel++
 		case *EndScope:
-			if v.blockLevel == 0 {
-				return fmt.Errorf("unbalanced end scope\n%s:%#x: %v", f.NameID, v.ip, op)
+			if ver.blockLevel == 0 {
+				return fmt.Errorf("unbalanced end scope\n%s:%#x: %v", f.NameID, ver.ip, op)
 			}
 
-			v.blockLevel--
-			if v.blockLevel == 0 {
-				if _, ok := f.Body[v.ip-1].(*Return); !ok {
-					return fmt.Errorf("missing return before end of function\n%s:%#x: %v", f.NameID, v.ip, op)
+			ver.blockLevel--
+			if ver.blockLevel == 0 {
+				if _, ok := f.Body[ver.ip-1].(*Return); !ok {
+					return fmt.Errorf("missing return before end of function\n%s:%#x: %v", f.NameID, ver.ip, op)
 				}
 			}
 
@@ -171,21 +171,21 @@ func (f *FunctionDefinition) Verify() (err error) {
 			if n == 0 {
 				n = x.Number
 			}
-			if _, ok := v.labels[n]; ok {
-				return fmt.Errorf("label redefined\n%s:%#x: %v", f.NameID, v.ip, op)
+			if _, ok := ver.labels[n]; ok {
+				return fmt.Errorf("label redefined\n%s:%#x: %v", f.NameID, ver.ip, op)
 			}
 
-			v.labels[n] = v.ip
+			ver.labels[n] = ver.ip
 		case *VariableDeclaration:
-			if g, e := x.Index, len(v.variables); g != e {
+			if g, e := x.Index, len(ver.variables); g != e {
 				return fmt.Errorf("invalid variable declaration operation index, got %v, expected %v", g, e)
 			}
 
-			v.variables = append(v.variables, x.TypeID)
+			ver.variables = append(ver.variables, x.TypeID)
 		}
 	}
 
-	if v.blockLevel != 0 {
+	if ver.blockLevel != 0 {
 		return fmt.Errorf("unbalanced BeginScope/EndScope")
 	}
 
@@ -211,7 +211,7 @@ func (f *FunctionDefinition) Verify() (err error) {
 		if n == 0 {
 			n = num
 		}
-		if _, ok := v.labels[n]; !ok {
+		if _, ok := ver.labels[n]; !ok {
 			return fmt.Errorf("undefined branch target\n%s:%#x: %v", f.NameID, ip, op)
 		}
 	}
@@ -235,7 +235,7 @@ func (f *FunctionDefinition) Verify() (err error) {
 					}
 
 					for i, v := range stack {
-						if g, e := v, ex[i]; g != e {
+						if g, e := v, ex[i]; g != e && !ver.assignable(g, e) {
 							return fmt.Errorf("evaluation stacks differ %v %v\n%s:%#x: %v", stack, ex, f.NameID, ip, v)
 						}
 					}
@@ -248,13 +248,13 @@ func (f *FunctionDefinition) Verify() (err error) {
 
 			ipFlags[ip] = 1
 
-			v.ip = ip
-			v.stack = stack
-			if err := f.Body[ip].verify(v); err != nil {
+			ver.ip = ip
+			ver.stack = stack
+			if err := f.Body[ip].verify(ver); err != nil {
 				return fmt.Errorf("%s\n%s:%#x: %v", err, f.NameID, ip, op)
 			}
 
-			stack = v.stack
+			stack = ver.stack
 		outer:
 			switch x := f.Body[ip].(type) {
 			case *Jmp:
@@ -262,7 +262,7 @@ func (f *FunctionDefinition) Verify() (err error) {
 				if n == 0 {
 					n = x.Number
 				}
-				ip = v.labels[n]
+				ip = ver.labels[n]
 				continue
 			case *Jnz:
 				n := -int(x.NameID)
@@ -274,7 +274,7 @@ func (f *FunctionDefinition) Verify() (err error) {
 					case y.Value != 0: // Always taken.
 						ipFlags[ip-1] = 0
 						f.Body[ip] = &Jmp{NameID: x.NameID, Number: x.Number, Position: x.Position}
-						ip = v.labels[n]
+						ip = ver.labels[n]
 						continue
 					default: // Never taken.
 						ipFlags[ip-1] = 0
@@ -283,7 +283,7 @@ func (f *FunctionDefinition) Verify() (err error) {
 					}
 				}
 
-				if err := g(v.labels[n], append([]TypeID(nil), stack...)); err != nil {
+				if err := g(ver.labels[n], append([]TypeID(nil), stack...)); err != nil {
 					return err
 				}
 			case *Jz:
@@ -296,7 +296,7 @@ func (f *FunctionDefinition) Verify() (err error) {
 					case y.Value == 0: // Always taken.
 						ipFlags[ip-1] = 0
 						f.Body[ip] = &Jmp{NameID: x.NameID, Number: x.Number, Position: x.Position}
-						ip = v.labels[n]
+						ip = ver.labels[n]
 						continue
 					default: // Never taken.
 						ipFlags[ip-1] = 0
@@ -305,7 +305,7 @@ func (f *FunctionDefinition) Verify() (err error) {
 					}
 				}
 
-				if err := g(v.labels[n], append([]TypeID(nil), stack...)); err != nil {
+				if err := g(ver.labels[n], append([]TypeID(nil), stack...)); err != nil {
 					return err
 				}
 			case *Label:
@@ -321,7 +321,7 @@ func (f *FunctionDefinition) Verify() (err error) {
 	}
 
 	if computedGotos {
-		for k, v := range v.labels {
+		for k, v := range ver.labels {
 			if k >= 0 {
 				continue
 			}
@@ -393,7 +393,7 @@ func (v *verifier) binop(t TypeID) error {
 		return fmt.Errorf("mismatched operand types: %s and %s", a, b)
 	}
 
-	if g, e := a, t; t != 0 && g != e {
+	if g, e := a, t; t != 0 && g != e && !v.assignable(g, e) {
 		return fmt.Errorf("mismatched operands types vs result type: %s and %s", g, e)
 	}
 
@@ -466,8 +466,14 @@ func (v *verifier) assignable(a, b TypeID) bool {
 
 	t := v.typeCache.MustType(a)
 	u := v.typeCache.MustType(b)
+	if t.Kind() == Function {
+		t = t.Pointer()
+	}
+	if u.Kind() == Function {
+		u = u.Pointer()
+	}
 
-	if t.Kind() == Pointer && u.Kind() == Pointer {
+	for t.Kind() == Pointer && u.Kind() == Pointer {
 		if v.isVoidPtr(a) || v.isVoidPtr(b) {
 			return true
 		}
