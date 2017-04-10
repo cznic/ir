@@ -6,13 +6,51 @@ package ir
 
 import (
 	"fmt"
+	"runtime"
 
 	"github.com/cznic/mathutil"
 )
 
-var (
-	memoryModels = map[string]MemoryModel{
-		"32": {
+func roundup(n, to int64) int64 {
+	if r := n % to; r != 0 {
+		return n + to - r
+	}
+
+	return n
+}
+
+// MemoryModelItem describes memory properties of a particular type kind.
+type MemoryModelItem struct {
+	Size        uint
+	Align       uint
+	StructAlign uint
+}
+
+// MemoryModel defines properties of types. A valid memory model must provide
+// model items for all type kinds except Array, Struct and Union. Methods of
+// invalid models may panic. Memory model instances are not modified by this
+// package and safe for concurrent use by multiple goroutines as long as any of
+// them does not modify them either.
+type MemoryModel map[TypeKind]MemoryModelItem
+
+// NewMemoryModel returns a new MemoryModel for the current architecture and
+// platform or an error, if any.
+func NewMemoryModel() (MemoryModel, error) {
+	switch arch := runtime.GOARCH; arch {
+	case
+		"386",
+		"arm",
+		"arm64be",
+		"armbe",
+		"mips",
+		"mipsle",
+		"ppc",
+		"ppc64le",
+		"s390",
+		"s390x",
+		"sparc":
+
+		return MemoryModel{
 			Int8:  MemoryModelItem{Align: 1, Size: 1, StructAlign: 1},
 			Int16: MemoryModelItem{Align: 2, Size: 2, StructAlign: 2},
 			Int32: MemoryModelItem{Align: 4, Size: 4, StructAlign: 4},
@@ -33,8 +71,14 @@ var (
 
 			Pointer:  MemoryModelItem{Align: 4, Size: 4, StructAlign: 4},
 			Function: MemoryModelItem{Align: 4, Size: 4, StructAlign: 4},
-		},
-		"48": {
+		}, nil
+
+	case
+		"amd64p32",
+		"mips64p32",
+		"mips64p32le":
+
+		return MemoryModel{
 			Int8:  MemoryModelItem{Align: 1, Size: 1, StructAlign: 1},
 			Int16: MemoryModelItem{Align: 2, Size: 2, StructAlign: 2},
 			Int32: MemoryModelItem{Align: 4, Size: 4, StructAlign: 4},
@@ -55,8 +99,17 @@ var (
 
 			Pointer:  MemoryModelItem{Align: 4, Size: 4, StructAlign: 4},
 			Function: MemoryModelItem{Align: 4, Size: 4, StructAlign: 4},
-		},
-		"64": {
+		}, nil
+
+	case
+		"amd64",
+		"arm64",
+		"mips64",
+		"mips64le",
+		"ppc64",
+		"sparc64":
+
+		return MemoryModel{
 			Int8:  MemoryModelItem{Align: 1, Size: 1, StructAlign: 1},
 			Int16: MemoryModelItem{Align: 2, Size: 2, StructAlign: 2},
 			Int32: MemoryModelItem{Align: 4, Size: 4, StructAlign: 4},
@@ -77,62 +130,10 @@ var (
 
 			Pointer:  MemoryModelItem{Align: 8, Size: 8, StructAlign: 8},
 			Function: MemoryModelItem{Align: 8, Size: 8, StructAlign: 8},
-		},
+		}, nil
+	default:
+		return nil, fmt.Errorf("unknown or unsupported architecture %s", arch)
 	}
-
-	// MemoryModels are predefined, R/O memory models.
-	MemoryModels = map[string]MemoryModel{
-		"386":         memoryModels["32"],
-		"amd64":       memoryModels["64"],
-		"amd64p32":    memoryModels["48"],
-		"arm":         memoryModels["32"],
-		"arm64":       memoryModels["64"],
-		"arm64be":     memoryModels["32"],
-		"armbe":       memoryModels["32"],
-		"mips":        memoryModels["32"],
-		"mips64":      memoryModels["64"],
-		"mips64le":    memoryModels["64"],
-		"mips64p32":   memoryModels["48"],
-		"mips64p32le": memoryModels["48"],
-		"mipsle":      memoryModels["32"],
-		"ppc":         memoryModels["32"],
-		"ppc64":       memoryModels["64"],
-		"ppc64le":     memoryModels["32"],
-		"s390":        memoryModels["32"],
-		"s390x":       memoryModels["32"],
-		"sparc":       memoryModels["32"],
-		"sparc64":     memoryModels["64"],
-	}
-)
-
-func init() {
-	for k, v := range MemoryModels {
-		if v == nil {
-			panic(k)
-		}
-	}
-}
-
-func roundup(n, to int64) int64 {
-	if r := n % to; r != 0 {
-		return n + to - r
-	}
-
-	return n
-}
-
-// MemoryModel defines properties of types. A valid memory model must provide
-// model items for all type kinds except Array, Struct and Union. Methods of
-// invalid models may panic. Memory model instances are not modified by this
-// package and safe for concurrent use by multiple goroutines as long as any of
-// them does not modify them either.
-type MemoryModel map[TypeKind]MemoryModelItem
-
-// MemoryModelItem describes memory properties of a particular type kind.
-type MemoryModelItem struct {
-	Size        uint
-	Align       uint
-	StructAlign uint
 }
 
 // Alignof computes the memory alignment requirements of t. Zero is returned

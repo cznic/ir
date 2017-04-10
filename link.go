@@ -11,12 +11,11 @@ import (
 )
 
 // LinkMain returns all objects transitively referenced from function _start or
-// an error, if any. Linking may mutate passed objects.
+// an error, if any. Linking may mutate passed objects. It's the caller
+// responsibility to ensure all translationUnits were produced for the same
+// architecture and platform.
 //
 // LinkMain panics when passed no data.
-//
-// Note: Caller is responsible to ensure that all translationUnits were
-// produced using the same memory model.
 func LinkMain(translationUnits ...[]Object) (_ []Object, err error) {
 	if !Testing {
 		defer func() {
