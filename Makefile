@@ -29,7 +29,7 @@ cpu: clean
 	go tool pprof -lines *.test cpu.out
 
 edit:
-	@ 1>/dev/null 2>/dev/null gvim -p Makefile *.go
+	@ 1>/dev/null 2>/dev/null gvim -p Makefile all_test.go enum.go etc.go ir.go link.go model.go type.go value.go
 
 editor: linkage_string.go tok_string.go typekind_string.go
 	gofmt -l -s -w *.go
