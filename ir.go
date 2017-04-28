@@ -203,6 +203,8 @@ func (f *FunctionDefinition) Verify() (err error) {
 		case *JmpP:
 			computedGotos = true
 			continue
+		case *Switch:
+			panic("TODO")
 		default:
 			continue
 		}
