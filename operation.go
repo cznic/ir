@@ -7,6 +7,8 @@ package ir
 import (
 	"fmt"
 	"go/token"
+
+	"github.com/cznic/internal/buffer"
 )
 
 const opw = 16
@@ -1133,6 +1135,15 @@ func (o *Label) String() string {
 	}
 }
 
+func (o *Label) str() string {
+	switch {
+	case o.NameID != 0:
+		return o.NameID.String()
+	default:
+		return fmt.Sprint(o.Number)
+	}
+}
+
 // Leq operation compares the top stack item (b) and the previous one (a) and
 // replaces both operands with a non zero int32 value if a <= b or zero
 // otherwise.
@@ -1835,8 +1846,18 @@ func (o *Switch) verify(v *verifier) error {
 	for _, v := range o.Values {
 		switch x := v.(type) {
 		case *Int32Value:
-			if o.TypeID != idInt32 {
-				return fmt.Errorf("invalid switch case value %T", x)
+			switch o.TypeID {
+			case idInt32, idUint32:
+				// ok
+			default:
+				return fmt.Errorf("invalid switch case value of type %v", o.TypeID)
+			}
+		case *Int64Value:
+			switch o.TypeID {
+			case idInt64, idUint64:
+				// ok
+			default:
+				return fmt.Errorf("invalid switch case value of type %v", o.TypeID)
 			}
 		default:
 			return fmt.Errorf("unsupported switch case value %T", x)
@@ -1848,7 +1869,25 @@ func (o *Switch) verify(v *verifier) error {
 }
 
 func (o *Switch) String() string {
-	return fmt.Sprintf("\t%-*s\t%s\t; %s", opw, "switch", o.TypeID, o.Position)
+	var buf buffer.Bytes
+
+	defer buf.Close()
+
+	for i, v := range o.Values {
+		var l Label
+		if i < len(o.Labels) {
+			l = o.Labels[i]
+		}
+		switch x := v.(type) {
+		case *Int32Value, *Int64Value:
+			fmt.Fprintf(&buf, "\n\tcase %v:", x)
+		default:
+			panic(fmt.Errorf("unsupported switch case value %T", x))
+		}
+		fmt.Fprintf(&buf, "\tgoto %v\t; %v", l.str(), l.Position)
+	}
+	fmt.Fprintf(&buf, "\n\tdefault:\tgoto %v\t; %v", o.Default.str(), o.Default.Position)
+	return fmt.Sprintf("\t%-*s\t%s\t; %s%s", opw, "switch", o.TypeID, o.Position, buf.Bytes())
 }
 
 // Variable pushes a function local variable by index, or its address, to the
