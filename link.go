@@ -280,6 +280,7 @@ func (l *linker) defineFunc(e extern, f *FunctionDefinition) (r int) {
 			*Store,
 			*StringConst,
 			*Sub,
+			*Switch,
 			*Variable,
 			*Xor:
 			// nop

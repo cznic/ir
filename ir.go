@@ -203,6 +203,18 @@ func (f *FunctionDefinition) Verify() (err error) {
 		case *JmpP:
 			computedGotos = true
 			continue
+		case *Switch:
+			for _, v := range x.Labels {
+				nm, num = v.NameID, v.Number
+				n := -int(nm)
+				if n == 0 {
+					n = num
+				}
+				if _, ok := ver.labels[n]; !ok {
+					return fmt.Errorf("undefined branch target\n%s:%#x: %v", f.NameID, ip, op)
+				}
+			}
+			continue
 		default:
 			continue
 		}
@@ -261,6 +273,22 @@ func (f *FunctionDefinition) Verify() (err error) {
 				n := -int(x.NameID)
 				if n == 0 {
 					n = x.Number
+				}
+				ip = ver.labels[n]
+				continue
+			case *Switch:
+				for _, v := range x.Labels {
+					n := -int(v.NameID)
+					if n == 0 {
+						n = v.Number
+					}
+					if err := g(ver.labels[n], append([]TypeID(nil), stack...)); err != nil {
+						return err
+					}
+				}
+				n := -int(x.Default.NameID)
+				if n == 0 {
+					n = x.Default.Number
 				}
 				ip = ver.labels[n]
 				continue

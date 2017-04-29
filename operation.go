@@ -7,6 +7,8 @@ package ir
 import (
 	"fmt"
 	"go/token"
+
+	"github.com/cznic/internal/buffer"
 )
 
 const opw = 16
@@ -65,6 +67,7 @@ var (
 	_ Operation = (*Store)(nil)
 	_ Operation = (*StringConst)(nil)
 	_ Operation = (*Sub)(nil)
+	_ Operation = (*Switch)(nil)
 	_ Operation = (*Variable)(nil)
 	_ Operation = (*VariableDeclaration)(nil)
 	_ Operation = (*Xor)(nil)
@@ -1097,7 +1100,8 @@ func (o *Jz) String() string {
 	}
 }
 
-// Label operation declares a named or numbered branch target.
+// Label operation declares a named or numbered branch target. A valid Label
+// must have a non zero NameID or non negative Number.
 type Label struct {
 	NameID
 	Number int
@@ -1107,9 +1111,16 @@ type Label struct {
 // Pos implements Operation.
 func (o *Label) Pos() token.Position { return o.Position }
 
+// A valid Label must have a non zero NameID or a non negative Number.
+func (o *Label) IsValid() bool { return o.NameID > 0 || o.Number >= 0 }
+
 func (o *Label) verify(v *verifier) error {
 	if o.NameID != 0 && len(v.stack) != 0 {
 		return fmt.Errorf("non empty evaluation stack at named label")
+	}
+
+	if !o.IsValid() {
+		return fmt.Errorf("invalid label")
 	}
 
 	return nil
@@ -1121,6 +1132,15 @@ func (o *Label) String() string {
 		return fmt.Sprintf("%v:\t\t\t; %s", o.NameID, o.Position)
 	default:
 		return fmt.Sprintf("%v:\t\t\t; %s", o.Number, o.Position)
+	}
+}
+
+func (o *Label) str() string {
+	switch {
+	case o.NameID != 0:
+		return o.NameID.String()
+	default:
+		return fmt.Sprint(o.Number)
 	}
 }
 
@@ -1786,6 +1806,88 @@ func (o *Sub) verify(v *verifier) error {
 
 func (o *Sub) String() string {
 	return fmt.Sprintf("\t%-*s\t%s\t; %s", opw, "sub", o.TypeID, o.Position)
+}
+
+// Switch jumps to a label according to a value at TOS or to a default label.
+// The value at TOS is removed from the evaluation stack.
+type Switch struct {
+	Default Label
+	Labels  []Label
+	TypeID  // Operand type.
+	Values  []Value
+	token.Position
+}
+
+// Pos implements Operation.
+func (o *Switch) Pos() token.Position { return o.Position }
+
+func (o *Switch) verify(v *verifier) error {
+	if o.TypeID == 0 {
+		return fmt.Errorf("missing type")
+	}
+
+	if !o.Default.IsValid() {
+		return fmt.Errorf("invalid default case")
+	}
+
+	if g, e := len(o.Values), len(o.Labels); g != e {
+		return fmt.Errorf("mismatched number of values and cases")
+	}
+
+	p := len(v.stack)
+	if p < 1 {
+		return fmt.Errorf("evaluation stack underflow")
+	}
+
+	if g, e := v.stack[p-1], o.TypeID; g != e {
+		return fmt.Errorf("mismatched operand types: %s and %s", g, e)
+	}
+
+	for _, v := range o.Values {
+		switch x := v.(type) {
+		case *Int32Value:
+			switch o.TypeID {
+			case idInt32, idUint32:
+				// ok
+			default:
+				return fmt.Errorf("invalid switch case value of type %v", o.TypeID)
+			}
+		case *Int64Value:
+			switch o.TypeID {
+			case idInt64, idUint64:
+				// ok
+			default:
+				return fmt.Errorf("invalid switch case value of type %v", o.TypeID)
+			}
+		default:
+			return fmt.Errorf("unsupported switch case value %T", x)
+		}
+	}
+
+	v.stack = v.stack[:p-1]
+	return nil
+}
+
+func (o *Switch) String() string {
+	var buf buffer.Bytes
+
+	defer buf.Close()
+
+	for i, v := range o.Values {
+		var l Label
+		if i < len(o.Labels) {
+			l = o.Labels[i]
+		}
+		switch x := v.(type) {
+		case *Int32Value, *Int64Value:
+			fmt.Fprintf(&buf, "\n\tcase %v:", x)
+		default:
+			panic(fmt.Errorf("unsupported switch case value %T", x))
+		}
+		fmt.Fprintf(&buf, "\tgoto %v\t; %v", l.str(), l.Position)
+	}
+	fmt.Fprintf(&buf, "\n\tdefault:\tgoto %v\t; %v", o.Default.str(), o.Default.Position)
+	return fmt.Sprintf("\t%-*s\t%s\t; %s%s", opw, "switch", o.TypeID, o.Position, buf.Bytes())
 }
 
 // Variable pushes a function local variable by index, or its address, to the
