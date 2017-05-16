@@ -434,6 +434,7 @@ func (o *Const) String() string {
 
 // Const32 operation pushes a 32 bit value on the evaluation stack.
 type Const32 struct {
+	LOp bool // This operation is an artifact of || or &&.
 	TypeID
 	Value int32
 	token.Position
@@ -452,7 +453,11 @@ func (o *Const32) verify(v *verifier) error {
 }
 
 func (o *Const32) String() string {
-	return fmt.Sprintf("\t%-*s\t%#x, %v\t; %s", opw, "const", uint32(o.Value), o.TypeID, o.Position)
+	s := ""
+	if o.LOp {
+		s = "(nop)"
+	}
+	return fmt.Sprintf("\t%-*s\t%#x, %v\t; %s", opw, "const"+s, uint32(o.Value), o.TypeID, o.Position)
 }
 
 // Const64 operation pushes a 64 bit value on the evaluation stack.
@@ -621,6 +626,7 @@ func (o *Div) String() string {
 // Drop operation removes one item from the evaluation stack.
 type Drop struct {
 	Comma bool // The drop operation is produced by the C comma operator.
+	LOp   bool // This operation is an artifact of || or &&.
 	TypeID
 	token.Position
 }
@@ -655,7 +661,11 @@ func (o *Drop) String() string {
 	if o.Comma {
 		s = ","
 	}
-	return fmt.Sprintf("\t%-*s%s\t%s\t; %s", opw, "drop", s, o.TypeID, o.Position)
+	s2 := ""
+	if o.LOp {
+		s2 = "(nop)"
+	}
+	return fmt.Sprintf("\t%-*s%s\t%s\t; %s", opw, "drop"+s2, s, o.TypeID, o.Position)
 }
 
 // Dup operation duplicates the top stack item.
@@ -1011,6 +1021,7 @@ func (o *Gt) String() string {
 
 // Jmp operation performs a branch to a named or numbered label.
 type Jmp struct {
+	Cond bool // This operation is an artifact of the conditional operator.
 	NameID
 	Number int
 	token.Position
@@ -1022,11 +1033,15 @@ func (o *Jmp) Pos() token.Position { return o.Position }
 func (o *Jmp) verify(v *verifier) error { return nil }
 
 func (o *Jmp) String() string {
+	s := ""
+	if o.Cond {
+		s = "(nop)"
+	}
 	switch {
 	case o.NameID != 0:
-		return fmt.Sprintf("\t%-*s\t%v\t; %s", opw, "jmp", o.NameID, o.Position)
+		return fmt.Sprintf("\t%-*s\t%v\t; %s", opw, "jmp"+s, o.NameID, o.Position)
 	default:
-		return fmt.Sprintf("\t%-*s\t%v\t; %s", opw, "jmp", o.Number, o.Position)
+		return fmt.Sprintf("\t%-*s\t%v\t; %s", opw, "jmp"+s, o.Number, o.Position)
 	}
 }
 
@@ -1064,6 +1079,7 @@ func (o *JmpP) String() string {
 // the stack is non zero. The TOS type must be int32 and the operation removes
 // TOS.
 type Jnz struct {
+	LOp bool // This operation is an artifact of || or &&.
 	NameID
 	Number int
 	token.Position
@@ -1075,17 +1091,22 @@ func (o *Jnz) Pos() token.Position { return o.Position }
 func (o *Jnz) verify(v *verifier) error { return v.branch() }
 
 func (o *Jnz) String() string {
+	s := ""
+	if o.LOp {
+		s = "(nop)"
+	}
 	switch {
 	case o.NameID != 0:
-		return fmt.Sprintf("\t%-*s\t%v\t; %s", opw, "jnz", o.NameID, o.Position)
+		return fmt.Sprintf("\t%-*s\t%v\t; %s", opw, "jnz"+s, o.NameID, o.Position)
 	default:
-		return fmt.Sprintf("\t%-*s\t%v\t; %s", opw, "jnz", o.Number, o.Position)
+		return fmt.Sprintf("\t%-*s\t%v\t; %s", opw, "jnz"+s, o.Number, o.Position)
 	}
 }
 
 // Jz operation performs a branch to a named or numbered label if the top of
 // the stack is zero. The TOS type must be int32 and the operation removes TOS.
 type Jz struct {
+	LOp bool // This operation is an artifact of || or && or the conditional operator.
 	NameID
 	Number int
 	token.Position
@@ -1097,18 +1118,26 @@ func (o *Jz) Pos() token.Position { return o.Position }
 func (o *Jz) verify(v *verifier) error { return v.branch() }
 
 func (o *Jz) String() string {
+	s := ""
+	if o.LOp {
+		s = "(nop)"
+	}
 	switch {
 	case o.NameID != 0:
-		return fmt.Sprintf("\t%-*s\t%v\t; %s", opw, "jz", o.NameID, o.Position)
+		return fmt.Sprintf("\t%-*s\t%v\t; %s", opw, "jz"+s, o.NameID, o.Position)
 	default:
-		return fmt.Sprintf("\t%-*s\t%v\t; %s", opw, "jz", o.Number, o.Position)
+		return fmt.Sprintf("\t%-*s\t%v\t; %s", opw, "jz"+s, o.Number, o.Position)
 	}
 }
 
 // Label operation declares a named or numbered branch target. A valid Label
 // must have a non zero NameID or non negative Number.
 type Label struct {
+	Cond bool // This operation is an artifact of the conditional operator.
+	LAnd bool // This operation is an artifact of &&.
+	LOr  bool // This operation is an artifact of ||.
 	NameID
+	Nop    bool // This operation is an artifact of the conditional operator.
 	Number int
 	token.Position
 }
@@ -1132,11 +1161,22 @@ func (o *Label) verify(v *verifier) error {
 }
 
 func (o *Label) String() string {
+	s := ""
+	switch {
+	case o.LAnd:
+		s = "(&&)"
+	case o.LOr:
+		s = "(||)"
+	case o.Cond:
+		s = "(a?b:c)"
+	case o.Nop:
+		s = "(nop)"
+	}
 	switch {
 	case o.NameID != 0:
-		return fmt.Sprintf("%v:\t\t\t; %s", o.NameID, o.Position)
+		return fmt.Sprintf("%v%s:\t\t\t; %s", o.NameID, s, o.Position)
 	default:
-		return fmt.Sprintf("%v:\t\t\t; %s", o.Number, o.Position)
+		return fmt.Sprintf("%v%s:\t\t\t; %s", o.Number, s, o.Position)
 	}
 }
 
