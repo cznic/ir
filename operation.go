@@ -620,6 +620,7 @@ func (o *Div) String() string {
 
 // Drop operation removes one item from the evaluation stack.
 type Drop struct {
+	Comma bool // The drop operation is produced by the C comma operator.
 	TypeID
 	token.Position
 }
@@ -650,7 +651,11 @@ func (o *Drop) verify(v *verifier) error {
 }
 
 func (o *Drop) String() string {
-	return fmt.Sprintf("\t%-*s\t%s\t; %s", opw, "drop", o.TypeID, o.Position)
+	s := ""
+	if o.Comma {
+		s = ","
+	}
+	return fmt.Sprintf("\t%-*s%s\t%s\t; %s", opw, "drop", s, o.TypeID, o.Position)
 }
 
 // Dup operation duplicates the top stack item.
