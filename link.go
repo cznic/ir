@@ -212,7 +212,7 @@ func (l *linker) checkCalls(p *[]Operation) {
 			}
 
 			t := l.typeCache.MustType(x.TypeID).(*PointerType).Element
-			v = &Call{Arguments: x.Arguments, Index: index, TypeID: t.ID(), Position: x.Position}
+			v = &Call{Arguments: x.Arguments, Index: index, TypeID: t.ID(), Position: x.Position, Comma: x.Comma}
 		}
 
 		s[w] = v
