@@ -247,7 +247,7 @@ func (f *FunctionDefinition) Verify() (err error) {
 					}
 
 					for i, v := range stack {
-						if g, e := v, ex[i]; g != e && !ver.assignable(g, e) {
+						if g, e := v, ex[i]; g != e {
 							return fmt.Errorf("evaluation stacks differ %v %v\n%s:%#x: %v", stack, ex, f.NameID, ip, v)
 						}
 					}
@@ -297,7 +297,7 @@ func (f *FunctionDefinition) Verify() (err error) {
 				if n == 0 {
 					n = x.Number
 				}
-				if y, ok := f.Body[ip-1].(*Const32); ok {
+				if y, ok := f.Body[ip-1].(*Const32); ok && !x.LOp {
 					switch {
 					case y.Value != 0: // Always taken.
 						ipFlags[ip-1] = 0
@@ -319,7 +319,7 @@ func (f *FunctionDefinition) Verify() (err error) {
 				if n == 0 {
 					n = x.Number
 				}
-				if y, ok := f.Body[ip-1].(*Const32); ok {
+				if y, ok := f.Body[ip-1].(*Const32); ok && !x.LOp {
 					switch {
 					case y.Value == 0: // Always taken.
 						ipFlags[ip-1] = 0
@@ -388,28 +388,6 @@ type verifier struct {
 	variables       []TypeID
 }
 
-func (v *verifier) validPtrBinop(a, b TypeID) bool {
-	if v.assignable(a, b) {
-		return true
-	}
-
-	t := v.typeCache.MustType(a)
-	u := v.typeCache.MustType(b)
-	if t.Kind() != Pointer && u.Kind() == Pointer {
-		t, u = u, t
-	}
-	if t.Kind() != Pointer {
-		return false
-	}
-
-	switch t.Kind() {
-	case Int8, Int16, Int32, Int64, Uint8, Uint16, Uint32, Uint64:
-		return true
-	}
-
-	return false
-}
-
 func (v *verifier) binop(t TypeID) error {
 	n := len(v.stack)
 	if n < 2 {
@@ -417,12 +395,8 @@ func (v *verifier) binop(t TypeID) error {
 	}
 
 	a, b := v.stack[n-2], v.stack[n-1]
-	if a != b && !v.validPtrBinop(a, b) {
+	if a != b {
 		return fmt.Errorf("mismatched operand types: %s and %s", a, b)
-	}
-
-	if g, e := a, t; t != 0 && g != e && !v.assignable(g, e) {
-		return fmt.Errorf("mismatched operands types vs result type: %s and %s", g, e)
 	}
 
 	v.stack = append(v.stack[:n-2], a)
@@ -487,62 +461,7 @@ func (v *verifier) branch() error {
 	return nil
 }
 
-func (v *verifier) assignable(a, b TypeID) bool {
-	if a == b {
-		return true
-	}
-
-	t := v.typeCache.MustType(a)
-	u := v.typeCache.MustType(b)
-	if t.Kind() == Function {
-		t = t.Pointer()
-	}
-	if u.Kind() == Function {
-		u = u.Pointer()
-	}
-
-	for t.Kind() == Pointer && u.Kind() == Pointer {
-		if v.isVoidPtr(a) || v.isVoidPtr(b) {
-			return true
-		}
-
-		t = t.(*PointerType).Element
-		u = u.(*PointerType).Element
-		if t.Kind() == Function && u.Kind() == Function {
-			a := t.(*FunctionType)
-			b := u.(*FunctionType)
-			at := a.Results
-			bt := b.Results
-			if len(at) != len(bt) {
-				return false
-			}
-
-			for i, r := range at {
-				if !v.assignable(r.ID(), bt[i].ID()) {
-					return false
-				}
-			}
-
-			return true
-		}
-	}
-
-	return false
-}
-
 func (v *verifier) isPtr(t TypeID) bool {
 	u := v.typeCache.MustType(t)
 	return u.Kind() == Pointer
-}
-
-func (v *verifier) isVoidPtr(t TypeID) bool {
-	u := v.typeCache.MustType(t)
-	for u.Kind() == Pointer {
-		if u.ID() == idVoidPtr {
-			return true
-		}
-
-		u = u.(*PointerType).Element
-	}
-	return false
 }

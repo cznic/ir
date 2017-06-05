@@ -40,7 +40,6 @@ func NewMemoryModel() (MemoryModel, error) {
 	case
 		"386",
 		"arm",
-		"arm64be",
 		"armbe",
 		"mips",
 		"mipsle",
@@ -62,12 +61,12 @@ func NewMemoryModel() (MemoryModel, error) {
 			Uint64: MemoryModelItem{Align: 4, Size: 8, StructAlign: 4},
 
 			Float32:  MemoryModelItem{Align: 4, Size: 4, StructAlign: 4},
-			Float64:  MemoryModelItem{Align: 4, Size: 8, StructAlign: 4},
-			Float128: MemoryModelItem{Align: 4, Size: 16, StructAlign: 4},
+			Float64:  MemoryModelItem{Align: 8, Size: 8, StructAlign: 4},
+			Float128: MemoryModelItem{Align: 8, Size: 16, StructAlign: 4},
 
-			Complex64:  MemoryModelItem{Align: 4, Size: 8, StructAlign: 4},
-			Complex128: MemoryModelItem{Align: 4, Size: 16, StructAlign: 4},
-			Complex256: MemoryModelItem{Align: 4, Size: 32, StructAlign: 4},
+			Complex64:  MemoryModelItem{Align: 8, Size: 8, StructAlign: 4},
+			Complex128: MemoryModelItem{Align: 8, Size: 16, StructAlign: 4},
+			Complex256: MemoryModelItem{Align: 8, Size: 32, StructAlign: 4},
 
 			Pointer:  MemoryModelItem{Align: 4, Size: 4, StructAlign: 4},
 			Function: MemoryModelItem{Align: 4, Size: 4, StructAlign: 4},
@@ -93,7 +92,7 @@ func NewMemoryModel() (MemoryModel, error) {
 			Float64:  MemoryModelItem{Align: 8, Size: 8, StructAlign: 8},
 			Float128: MemoryModelItem{Align: 8, Size: 16, StructAlign: 8},
 
-			Complex64:  MemoryModelItem{Align: 8, Size: 8, StructAlign: 8},
+			Complex64:  MemoryModelItem{Align: 8, Size: 8, StructAlign: 4},
 			Complex128: MemoryModelItem{Align: 8, Size: 16, StructAlign: 8},
 			Complex256: MemoryModelItem{Align: 8, Size: 32, StructAlign: 8},
 
@@ -104,6 +103,7 @@ func NewMemoryModel() (MemoryModel, error) {
 	case
 		"amd64",
 		"arm64",
+		"arm64be",
 		"mips64",
 		"mips64le",
 		"ppc64",
@@ -124,7 +124,7 @@ func NewMemoryModel() (MemoryModel, error) {
 			Float64:  MemoryModelItem{Align: 8, Size: 8, StructAlign: 8},
 			Float128: MemoryModelItem{Align: 8, Size: 16, StructAlign: 8},
 
-			Complex64:  MemoryModelItem{Align: 8, Size: 8, StructAlign: 8},
+			Complex64:  MemoryModelItem{Align: 8, Size: 8, StructAlign: 4},
 			Complex128: MemoryModelItem{Align: 8, Size: 16, StructAlign: 8},
 			Complex256: MemoryModelItem{Align: 8, Size: 32, StructAlign: 8},
 

@@ -172,11 +172,7 @@ func (o *Argument) verify(v *verifier) error {
 		t = t.Pointer()
 	}
 	if g, e := o.TypeID, t.ID(); g != e {
-		u := v.typeCache.MustType(e)
-		ok := u.Kind() == Array && g == u.(*ArrayType).Item.Pointer().ID()
-		if !ok {
-			return fmt.Errorf("have %s, expected type %s", g, e)
-		}
+		return fmt.Errorf("have %s, expected type %s", g, e)
 	}
 
 	v.stack = append(v.stack, o.TypeID)
@@ -256,7 +252,7 @@ func (o *Bool) verify(v *verifier) error {
 		return fmt.Errorf("evaluation stack underflow")
 	}
 
-	if g, e := v.stack[n-1], o.TypeID; g != e && !v.assignable(g, e) {
+	if g, e := v.stack[n-1], o.TypeID; g != e {
 		return fmt.Errorf("mismatched types, got %s, expected %s", g, e)
 	}
 
@@ -303,7 +299,7 @@ func (o *Call) verify(v *verifier) error {
 	}
 
 	for i, r := range results {
-		if g, e := v.stack[ap-len(results)+i], r.ID(); g != e && !v.assignable(g, e) {
+		if g, e := v.stack[ap-len(results)+i], r.ID(); g != e {
 			return fmt.Errorf("mismatched result #%v, got %s, expected %s", i, g, e)
 		}
 	}
@@ -314,15 +310,12 @@ func (o *Call) verify(v *verifier) error {
 			break
 		}
 
-		if g, e := val, args[i].ID(); g != e && !v.assignable(g, e) {
-			u := v.typeCache.MustType(e)
-			if u.Kind() == Pointer {
-				u = u.(*PointerType).Element
-			}
-			ok := u.Kind() == Array && g == u.(*ArrayType).Item.Pointer().ID()
-			if !ok {
-				return fmt.Errorf("invalid argument #%v type, got %v, expected %s", i, g, e)
-			}
+		at := args[i]
+		if at.Kind() == Array {
+			at = at.(*ArrayType).Item.Pointer()
+		}
+		if g, e := val, at.ID(); g != e {
+			return fmt.Errorf("invalid argument #%v type, got %v, expected %s", i, g, e)
 		}
 	}
 
@@ -384,7 +377,7 @@ func (o *CallFP) verify(v *verifier) error {
 
 	for i, r := range results {
 		// | #0 | fp |
-		if g, e := v.stack[fp-len(results)+i], r.ID(); g != e && !v.assignable(g, e) {
+		if g, e := v.stack[fp-len(results)+i], r.ID(); g != e {
 			return fmt.Errorf("mismatched result #%v, got %s, expected %s", i, g, e)
 		}
 	}
@@ -395,15 +388,12 @@ func (o *CallFP) verify(v *verifier) error {
 			break
 		}
 
-		if g, e := val, args[i].ID(); g != e && !v.assignable(g, e) {
-			u := v.typeCache.MustType(e)
-			if u.Kind() == Pointer {
-				u = u.(*PointerType).Element
-			}
-			ok := u.Kind() == Array && g == u.(*ArrayType).Item.Pointer().ID()
-			if !ok {
-				return fmt.Errorf("invalid argument #%v type, got %v, expected %s", i, g, e)
-			}
+		at := args[i]
+		if at.Kind() == Array {
+			at = at.(*ArrayType).Item.Pointer()
+		}
+		if g, e := val, at.ID(); g != e {
+			return fmt.Errorf("invalid argument #%v type, got %v, expected %s", i, g, e)
 		}
 	}
 
@@ -536,7 +526,7 @@ func (o *Convert) verify(v *verifier) error {
 		return fmt.Errorf("evaluation stack underflow")
 	}
 
-	if g, e := v.stack[n-1], o.TypeID; g != e && !v.assignable(g, e) {
+	if g, e := v.stack[n-1], o.TypeID; g != e {
 		return fmt.Errorf("mismatched types, got %s, expected %s", g, e)
 	}
 
@@ -569,15 +559,12 @@ func (o *Copy) verify(v *verifier) error {
 	}
 
 	t := v.typeCache.MustType(o.TypeID)
-	if t.Kind() == Array {
-		t = t.(*ArrayType).Item
-	}
 	t = t.Pointer()
-	if g, e := v.stack[n-2], t.ID(); g != e && g != idVoidPtr {
+	if g, e := v.stack[n-2], t.ID(); g != e {
 		return fmt.Errorf("mismatched destination type, got %s, expected %s", g, e)
 	}
 
-	if g, e := v.stack[n-1], t.ID(); g != e && g != idVoidPtr {
+	if g, e := v.stack[n-1], t.ID(); g != e {
 		return fmt.Errorf("mismatched source type, got %s, expected %s", g, e)
 	}
 
@@ -655,11 +642,7 @@ func (o *Drop) verify(v *verifier) error {
 	}
 
 	t := v.typeCache.MustType(o.TypeID)
-	switch t.Kind() {
-	case Array:
-		t = t.(*ArrayType).Item.Pointer()
-	}
-	if g, e := v.stack[n-1], t.ID(); !v.assignable(g, e) {
+	if g, e := v.stack[n-1], t.ID(); g != e {
 		return fmt.Errorf("operand type mismatch, got %s, expected %s", g, e)
 	}
 	v.stack = v.stack[:len(v.stack)-1]
@@ -697,7 +680,7 @@ func (o *Dup) verify(v *verifier) error {
 		return fmt.Errorf("evaluation stack underflow")
 	}
 
-	if g, e := v.stack[n-1], o.TypeID; g != e && !v.assignable(g, e) {
+	if g, e := v.stack[n-1], o.TypeID; g != e {
 		return fmt.Errorf("operand type mismatch, got %s, expected %s", g, e)
 	}
 
@@ -742,20 +725,8 @@ func (o *Element) verify(v *verifier) error {
 		return fmt.Errorf("evaluation stack underflow")
 	}
 
-	if g, e := o.TypeID, v.stack[n-2]; g != e {
-		ok := false
-		if e2 := v.typeCache.MustType(e); e2.Kind() == Pointer {
-			e3 := e2.(*PointerType).Element
-			if e3.Kind() == Array {
-				ok = g == e3.(*ArrayType).Item.Pointer().ID()
-			}
-		}
-		if !ok {
-			ok = v.isVoidPtr(e) && v.isPtr(g)
-		}
-		if !ok {
-			return fmt.Errorf("mismatched type, got %s, expected %s", g, e)
-		}
+	if e, g := o.TypeID, v.stack[n-2]; g != e {
+		return fmt.Errorf("mismatched type, got %s, expected %s", g, e)
 	}
 
 	pt := v.typeCache.MustType(o.TypeID)
@@ -763,12 +734,9 @@ func (o *Element) verify(v *verifier) error {
 		return fmt.Errorf("expected a pointer type, have %v", o.TypeID)
 	}
 
-	t := pt.(*PointerType).Element
-	if o.Address {
-		if t.Kind() == Array {
-			t = t.(*ArrayType).Item
-		}
-		t = t.Pointer()
+	t := pt
+	if !o.Address {
+		t = pt.(*PointerType).Element
 	}
 	v.stack = append(v.stack[:n-2], t.ID())
 	return nil
@@ -858,7 +826,7 @@ func (o *Field) verify(v *verifier) error {
 		return fmt.Errorf("evaluation stack underflow")
 	}
 
-	if g, e := o.TypeID, v.stack[n-1]; g != e && !v.assignable(g, e) {
+	if g, e := o.TypeID, v.stack[n-1]; g != e {
 		return fmt.Errorf("mismatched field pointer types, got %s, expected %s", g, e)
 	}
 
@@ -879,12 +847,7 @@ func (o *Field) verify(v *verifier) error {
 
 	t = st.Fields[o.Index]
 	if o.Address {
-		switch t.Kind() {
-		case Array:
-			t = t.(*ArrayType).Item.Pointer()
-		default:
-			t = t.Pointer()
-		}
+		t = t.Pointer()
 	}
 	v.stack[n-1] = t.ID()
 	return nil
@@ -1241,7 +1204,7 @@ func (o *Load) verify(v *verifier) error {
 		return fmt.Errorf("evaluation stack underflow")
 	}
 
-	if g, e := o.TypeID, v.stack[n-1]; g != e && !v.assignable(g, e) {
+	if g, e := o.TypeID, v.stack[n-1]; g != e {
 		return fmt.Errorf("mismatched types, got %s, expected %s", g, e)
 	}
 
@@ -1520,7 +1483,7 @@ func (o *PostIncrement) verify(v *verifier) error {
 		return fmt.Errorf("invalid operand type %s ", v.stack[n-1])
 	}
 
-	if g, e := o.TypeID, t.ID(); g != e && !v.assignable(g, e) {
+	if g, e := o.TypeID, t.ID(); g != e {
 		return fmt.Errorf("mismatched operand types %s and %s", g, e)
 	}
 	switch {
@@ -1577,7 +1540,7 @@ func (o *PreIncrement) verify(v *verifier) error {
 		return fmt.Errorf("invalid operand type %s ", v.stack[n-1])
 	}
 
-	if g, e := o.TypeID, t.ID(); g != e && !v.assignable(g, e) {
+	if g, e := o.TypeID, t.ID(); g != e {
 		return fmt.Errorf("mismatched operand types %s and %s", g, e)
 	}
 
@@ -1627,7 +1590,7 @@ func (o *PtrDiff) verify(v *verifier) error {
 		return fmt.Errorf("pointer type required, have %s", g)
 	}
 
-	if g, e := v.stack[n-2], v.stack[n-1]; g != e && !v.assignable(g, e) {
+	if g, e := v.stack[n-2], v.stack[n-1]; g != e {
 		return fmt.Errorf("mismatched operand types %s and %s", g, e)
 	}
 
@@ -1802,8 +1765,8 @@ func (o *Store) verify(v *verifier) error {
 		return fmt.Errorf("expected pointer and value at TOS, got %s and %s (%v)", tid, v.stack[p+1], v.stack)
 	}
 
-	if g, e := pt.(*PointerType).Element.ID(), v.stack[p+1]; !v.assignable(g, e) {
-		return fmt.Errorf("mismatched operand types: %s and %s", g, e)
+	if e, g := o.TypeID, v.stack[p+1]; g != e {
+		return fmt.Errorf("mismatched operand types: got %s expected %s", g, e)
 	}
 
 	v.stack = append(v.stack[:p], v.stack[p+1])
@@ -1968,12 +1931,7 @@ func (o *Variable) verify(v *verifier) error {
 
 	t := v.typeCache.MustType(v.variables[o.Index])
 	if o.Address {
-		switch {
-		case t.Kind() == Array:
-			t = t.(*ArrayType).Item.Pointer()
-		default:
-			t = t.Pointer()
-		}
+		t = t.Pointer()
 	}
 	if g, e := o.TypeID, t.ID(); g != e {
 		return fmt.Errorf("expected type %s", e)
