@@ -74,11 +74,12 @@ type Object interface {
 
 // ObjectBase collects fields common to all objects.
 type ObjectBase struct {
-	token.Position
-	NameID
-	TypeID
 	Linkage
+	NameID
+	Package NameID
+	TypeID
 	TypeName NameID
+	token.Position
 }
 
 func newObjectBase(p token.Position, nm, tnm NameID, typ TypeID, l Linkage) ObjectBase {

@@ -114,11 +114,13 @@ func (l *linker) collectSymbols() {
 								panic("internal error")
 							}
 
-							if len(def.Body) == 1 {
-								if _, ok := def.Body[0].(*Panic); ok {
-									l.extern[x.NameID] = extern{unit: unit, index: i}
-									break
-								}
+							if len(def.Body) != 1 {
+								break
+							}
+
+							if _, ok := def.Body[0].(*Panic); ok {
+								l.extern[x.NameID] = extern{unit: unit, index: i}
+								break
 							}
 
 							panic(fmt.Errorf("%s: internal error %s", x.Position, x.NameID))
