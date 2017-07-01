@@ -34,7 +34,6 @@ var (
 	idUint32        = TypeID(dict.SID("uint32"))
 	idUint64        = TypeID(dict.SID("uint64"))
 	idVoid          = TypeID(dict.SID("struct{}"))
-	idVoidPtr       = TypeID(dict.SID("*struct{}"))
 
 	printHooks = strutil.PrettyPrintHooks{
 		reflect.TypeOf(NameID(0)): func(f strutil.Formatter, v interface{}, prefix, suffix string) {

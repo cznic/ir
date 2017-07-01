@@ -74,6 +74,7 @@ type Object interface {
 
 // ObjectBase collects fields common to all objects.
 type ObjectBase struct {
+	Comment NameID
 	Linkage
 	NameID
 	Package NameID
@@ -460,9 +461,4 @@ func (v *verifier) branch() error {
 
 	v.stack = v.stack[:n-1]
 	return nil
-}
-
-func (v *verifier) isPtr(t TypeID) bool {
-	u := v.typeCache.MustType(t)
-	return u.Kind() == Pointer
 }

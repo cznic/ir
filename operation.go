@@ -1118,7 +1118,7 @@ type Label struct {
 // Pos implements Operation.
 func (o *Label) Pos() token.Position { return o.Position }
 
-// A valid Label must have a non zero NameID or a non negative Number.
+// IsValid reports whether o has a positive NameID or a non negative Number.
 func (o *Label) IsValid() bool { return o.NameID > 0 || o.Number >= 0 }
 
 func (o *Label) verify(v *verifier) error {
