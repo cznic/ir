@@ -6,6 +6,7 @@ package ir
 
 import (
 	"fmt"
+	"sort"
 
 	"github.com/cznic/internal/buffer"
 )
@@ -33,6 +34,32 @@ func LinkMain(translationUnits ...[]Object) (_ []Object, err error) {
 	}
 	l := newLinker(translationUnits)
 	l.linkMain()
+	return l.out, nil
+}
+
+// LinkLib returns all objects with external linkage defined in
+// translationUnits.  Linking may mutate passed objects. It's the caller
+// responsibility to ensure all translationUnits were produced for the same
+// architecture and platform.
+//
+// LinkLib panics when passed no data.
+func LinkLib(translationUnits ...[]Object) (_ []Object, err error) {
+	if !Testing {
+		defer func() {
+			switch x := recover().(type) {
+			case nil:
+				// nop
+			case error:
+				if err == nil {
+					err = x
+				}
+			default:
+				err = fmt.Errorf("%v", x)
+			}
+		}()
+	}
+	l := newLinker(translationUnits)
+	l.link()
 	return l.out, nil
 }
 
@@ -428,4 +455,15 @@ func (l *linker) linkMain() {
 		panic(fmt.Errorf("_start undefined (forgotten crt0?)"))
 	}
 	l.define(start)
+}
+
+func (l *linker) link() {
+	var a []int
+	for k := range l.extern {
+		a = append(a, int(k))
+	}
+	sort.Ints(a)
+	for _, k := range a {
+		l.define(l.extern[NameID(k)])
+	}
 }
