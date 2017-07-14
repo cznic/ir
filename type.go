@@ -70,6 +70,10 @@ func (t *TypeBase) setID(id TypeID, p0 []byte, p *[]byte, c TypeCache, u Type) T
 	if id == 0 {
 		id = TypeID(dict.ID(p0[:len(p0)-len(*p)]))
 	}
+	if u, ok := c[id]; ok {
+		return u
+	}
+
 	t.TypeID = id
 	c[id] = u
 	return u
@@ -161,8 +165,9 @@ func (t *PointerType) Pointer() Type { return newPointerType(t) }
 // StructOrUnionType represents a collection of fields that can be selected by
 // name.
 type StructOrUnionType struct {
-	TypeBase
 	Fields []Type
+	Names  []NameID
+	TypeBase
 }
 
 // Pointer implements Type.
@@ -171,6 +176,12 @@ func (t *StructOrUnionType) Pointer() Type { return newPointerType(t) }
 // TypeCache maps TypeIDs to  Types. Use TypeCache{} to create a ready to use
 // TypeCache value.
 type TypeCache map[TypeID]Type
+
+// Fields set field names t, which must represent a struct or union type.
+func (c TypeCache) Fields(t TypeID, names []NameID) {
+	typ := c.MustType(t).(*StructOrUnionType)
+	typ.Names = names
+}
 
 func (c TypeCache) c(p *[]byte) tok {
 	s := *p
