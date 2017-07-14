@@ -28,7 +28,7 @@ func LinkMain(translationUnits ...[]Object) (_ []Object, err error) {
 					err = x
 				}
 			default:
-				err = fmt.Errorf("%v", x)
+				err = fmt.Errorf("ir.LinkMain PANIC: %v", x)
 			}
 		}()
 	}
@@ -54,7 +54,7 @@ func LinkLib(translationUnits ...[]Object) (_ []Object, err error) {
 					err = x
 				}
 			default:
-				err = fmt.Errorf("%v", x)
+				err = fmt.Errorf("ir.LinkLib PANIC %v", x)
 			}
 		}()
 	}
@@ -107,14 +107,14 @@ func (l *linker) collectSymbols() {
 						switch def := l.in[ex.unit][ex.index].(type) {
 						case *DataDefinition:
 							if x.TypeID != def.TypeID {
-								panic("internal error")
+								panic("ir.linker internal error")
 							}
 
 							if x.Value != nil && def.Value == nil {
 								def.Value = x.Value
 							}
 						default:
-							panic(fmt.Errorf("internal error %T", def))
+							panic(fmt.Errorf("ir.linker internal error %T", def))
 						}
 					default:
 						l.extern[x.NameID] = extern{unit: unit, index: i}
@@ -123,12 +123,12 @@ func (l *linker) collectSymbols() {
 					k := intern{x.NameID, unit}
 					switch _, ok := l.intern[k]; {
 					case ok:
-						panic(fmt.Errorf("TODO: %T(%v)", x, x))
+						panic(fmt.Errorf("ir.linker TODO: %T(%v)", x, x))
 					default:
 						l.intern[k] = i
 					}
 				default:
-					panic("internal error")
+					panic("ir.linker iinternal error")
 				}
 			case *FunctionDefinition:
 				switch x.Linkage {
@@ -150,9 +150,9 @@ func (l *linker) collectSymbols() {
 								break
 							}
 
-							panic(fmt.Errorf("%s: internal error %s", x.Position, x.NameID))
+							panic(fmt.Errorf("%s: ir.linker internal error %s", x.Position, x.NameID))
 						default:
-							panic(fmt.Errorf("internal error %T", def))
+							panic(fmt.Errorf("ir.linker internal error %T", def))
 						}
 					default:
 						l.extern[x.NameID] = extern{unit: unit, index: i}
@@ -166,10 +166,10 @@ func (l *linker) collectSymbols() {
 						l.intern[k] = i
 					}
 				default:
-					panic("internal error")
+					panic("ir.linker internal error")
 				}
 			default:
-				panic(fmt.Errorf("internal error: %T(%v)", x, x))
+				panic(fmt.Errorf("ir.linker internal error: %T(%v)", x, x))
 			}
 		}
 	}
@@ -192,19 +192,19 @@ func (l *linker) initializer(op *VariableDeclaration, v Value) {
 		case ExternalLinkage:
 			e, ok := l.extern[x.NameID]
 			if !ok {
-				panic(fmt.Errorf("%s: undefined extern %s", op.Position, x.NameID))
+				panic(fmt.Errorf("%s: ir.linker undefined extern %s", op.Position, x.NameID))
 			}
 
 			x.Index = l.define(e)
 		default:
-			panic(fmt.Errorf("internal error %s", x.Linkage))
+			panic(fmt.Errorf("ir.linker internal error %s", x.Linkage))
 		}
 	case *CompositeValue:
 		for _, v := range x.Values {
 			l.initializer(op, v)
 		}
 	default:
-		panic(fmt.Errorf("internal error: %T %v", x, op))
+		panic(fmt.Errorf("ir.linker internal error: %T %v", x, op))
 	}
 }
 
@@ -322,20 +322,20 @@ func (l *linker) defineFunc(e extern, f *FunctionDefinition) (r int) {
 					case ok:
 						v.Index = l.define(ex)
 					default:
-						panic("TODO")
+						panic("ir.linker TODO")
 					}
 				case InternalLinkage:
 					switch ex, ok := l.intern[intern{v.NameID, e.unit}]; {
 					case ok:
 						v.Index = l.define(extern{unit: e.unit, index: ex})
 					default:
-						panic("TODO")
+						panic("ir.linker TODO")
 					}
 				default:
 					panic("internal error")
 				}
 			default:
-				panic(fmt.Errorf("%s: %T", x.Position, v))
+				panic(fmt.Errorf("%s: ir.linker %T", x.Position, v))
 			}
 		case *Global:
 			switch x.Linkage {
@@ -353,7 +353,7 @@ func (l *linker) defineFunc(e extern, f *FunctionDefinition) (r int) {
 					case ok:
 						x.Index = l.define(ex)
 					default:
-						panic(fmt.Errorf("%v: undefined %v", x.Position, x.NameID))
+						panic(fmt.Errorf("%v: ir.linker undefined external global %v", x.Position, x.NameID))
 					}
 				}
 			case InternalLinkage:
@@ -361,7 +361,7 @@ func (l *linker) defineFunc(e extern, f *FunctionDefinition) (r int) {
 				case ok:
 					x.Index = l.define(extern{e.unit, ex})
 				default:
-					panic(fmt.Errorf("%v: undefined %v", x.Position, x.NameID))
+					panic(fmt.Errorf("%v: ir.linker undefined global %v", x.Position, x.NameID))
 				}
 			default:
 				panic("internal error")
@@ -369,7 +369,7 @@ func (l *linker) defineFunc(e extern, f *FunctionDefinition) (r int) {
 		case *VariableDeclaration:
 			l.initializer(x, x.Value)
 		default:
-			panic(fmt.Errorf("internal error: %T %s %#05x %v", x, f.NameID, ip, x))
+			panic(fmt.Errorf("ir.linker internal error: %T %s %#05x %v", x, f.NameID, ip, x))
 		}
 	}
 	l.checkCalls(&f.Body)
@@ -392,7 +392,7 @@ func (l *linker) defineData(e extern, d *DataDefinition) (r int) {
 				case ok:
 					x.Index = l.define(ex)
 				default:
-					panic(fmt.Errorf("%s: undefined %q", d.Position, x.NameID))
+					panic(fmt.Errorf("%s: ir.linker undefined external address %q", d.Position, x.NameID))
 				}
 			case InternalLinkage:
 				switch ex, ok := l.intern[intern{x.NameID, e.unit}]; {
@@ -406,7 +406,7 @@ func (l *linker) defineData(e extern, d *DataDefinition) (r int) {
 						}
 						fallthrough
 					default:
-						panic(fmt.Errorf("%s: undefined %q", d.Position, x.NameID))
+						panic(fmt.Errorf("%s: ir.linker undefined address %q", d.Position, x.NameID))
 					}
 				}
 			default:
@@ -427,7 +427,7 @@ func (l *linker) defineData(e extern, d *DataDefinition) (r int) {
 			*WideStringValue:
 			// ok, nop.
 		default:
-			panic(fmt.Errorf("%v.%v: internal error: %T", e.unit, e.index, x))
+			panic(fmt.Errorf("%v.%v: ir.linker internal error: %T", e.unit, e.index, x))
 		}
 	}
 	f(d.Value)
@@ -445,14 +445,14 @@ func (l *linker) define(e extern) int {
 	case *FunctionDefinition:
 		return l.defineFunc(e, x)
 	default:
-		panic(fmt.Errorf("internal error: %T(%v)", x, x))
+		panic(fmt.Errorf("ir.linker internal error: %T(%v)", x, x))
 	}
 }
 
 func (l *linker) linkMain() {
 	start, ok := l.extern[NameID(idStart)]
 	if !ok {
-		panic(fmt.Errorf("_start undefined (forgotten crt0?)"))
+		panic(fmt.Errorf("ir.linker i_start undefined (forgotten crt0?)"))
 	}
 	l.define(start)
 }
