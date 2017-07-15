@@ -53,7 +53,7 @@ func (k TypeKind) Kind() TypeKind { return k }
 type tok int
 
 const (
-	_ tok = iota + 0x7f
+	_ tok = iota + 0xff
 
 	tokI8
 	tokI16
@@ -78,6 +78,8 @@ const (
 	tokNumber
 	tokStruct
 	tokUnion
+
+	tokName
 
 	tokEOF
 	tokIllegal

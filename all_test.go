@@ -204,16 +204,19 @@ func TestParser(t *testing.T) {
 		"int32",
 		"int64",
 		"int8",
-		"struct{int8,int16}",
-		"struct{int8,struct{int16,int32},int64}",
-		"struct{int8}",
+		"struct{ int8,a int16}",
+		"struct{_ int8, int16}",
+		"struct{ int8, int16}",
+		"struct{_ int8,a int16}",
+		"struct{a int8,a struct{a int16,a int32},a int64}",
+		"struct{a int8}",
 		"struct{}",
 		"uint16",
 		"uint32",
 		"uint64",
 		"uint8",
-		"union{int8,int16}",
-		"union{int8}",
+		"union{a int8,b int16}",
+		"union{c int8}",
 		"union{}",
 	} {
 		for _, suffix := range []string{
@@ -262,7 +265,7 @@ func TestParser(t *testing.T) {
 
 func TestParser2(t *testing.T) {
 	types = TypeCache{}
-	if _, err := types.Type(TypeID(dict.SID("struct{int8,struct{int16,int32},int64}"))); err != nil {
+	if _, err := types.Type(TypeID(dict.SID("struct{a int8,b struct{c int16,d int32},e int64}"))); err != nil {
 		t.Fatal(err)
 	}
 
@@ -280,8 +283,8 @@ int16
 int32
 int64
 int8
-struct{int16,int32}
-struct{int8,struct{int16,int32},int64}
+struct{a int8,b struct{c int16,d int32},e int64}
+struct{c int16,d int32}
 `); g != e {
 		t.Fatalf("==== got\n%s\n==== exp\n%s", g, e)
 	}
@@ -299,21 +302,21 @@ func TestAlignSize(t *testing.T) {
 		{"[1]int8", 1, 1},
 		{"[2]int16", 2, 4},
 		{"[2]int8", 1, 2},
-		{"[2]struct{[3]int8,int64}", 8, 32},
-		{"[2]struct{int64,[3]int8}", 8, 32},
-		{"[2]struct{int64,int8}", 8, 32},
-		{"[2]struct{int8,int64}", 8, 32},
-		{"[2]union{[3]int8,int64}", 8, 16},
-		{"[2]union{int64,[3]int8}", 8, 16},
-		{"[2]union{int64,int8}", 8, 16},
-		{"[2]union{int8,int64}", 8, 16},
+		{"[2]struct{_ [3]int8,_ int64}", 8, 32},
+		{"[2]struct{_ int64,_ [3]int8}", 8, 32},
+		{"[2]struct{_ int64,_ int8}", 8, 32},
+		{"[2]struct{_ int8,_ int64}", 8, 32},
+		{"[2]union{_ [3]int8,_ int64}", 8, 16},
+		{"[2]union{_ int64,_ [3]int8}", 8, 16},
+		{"[2]union{_ int64,_ int8}", 8, 16},
+		{"[2]union{_ int8,_ int64}", 8, 16},
 		{"func()", 8, 8},
-		{"struct{int32,struct{},int32}", 4, 8},
-		{"struct{int64,int8}", 8, 16},
-		{"struct{int64}", 8, 8},
+		{"struct{_ int32,_ struct{},_ int32}", 4, 8},
+		{"struct{_ int64,_ int8}", 8, 16},
+		{"struct{_ int64}", 8, 8},
 		{"struct{}", 1, 0},
-		{"union{int64,int8}", 8, 8},
-		{"union{int64}", 8, 8},
+		{"union{_ int64,_ int8}", 8, 8},
+		{"union{_ int64}", 8, 8},
 		{"union{}", 1, 0},
 	} {
 		typ, err := types.Type(TypeID(dict.SID(v.src)))
@@ -336,21 +339,21 @@ func TestLayoutOffset(t *testing.T) {
 		src string
 		off []int64
 	}{
-		{"struct{int16,int8,int8,int16}", []int64{0, 2, 3, 4}},
-		{"struct{int16,int8,int8,int32}", []int64{0, 2, 3, 4}},
-		{"struct{int16,int8,int8,int64}", []int64{0, 2, 3, 8}},
-		{"struct{int16,int8,int8}", []int64{0, 2, 3}},
-		{"struct{int16,int8}", []int64{0, 2}},
-		{"struct{int8,int16}", []int64{0, 2}},
-		{"struct{int8}", []int64{0}},
+		{"struct{_ int16,_ int8,_ int8,_ int16}", []int64{0, 2, 3, 4}},
+		{"struct{_ int16,_ int8,_ int8,_ int32}", []int64{0, 2, 3, 4}},
+		{"struct{_ int16,_ int8,_ int8,_ int64}", []int64{0, 2, 3, 8}},
+		{"struct{_ int16,_ int8,_ int8}", []int64{0, 2, 3}},
+		{"struct{_ int16,_ int8}", []int64{0, 2}},
+		{"struct{_ int8,_ int16}", []int64{0, 2}},
+		{"struct{_ int8}", []int64{0}},
 		{"struct{}", nil},
-		{"union{int16,int8,int8,int16}", []int64{0, 0, 0, 0}},
-		{"union{int16,int8,int8,int32}", []int64{0, 0, 0, 0}},
-		{"union{int16,int8,int8,int64}", []int64{0, 0, 0, 0}},
-		{"union{int16,int8,int8}", []int64{0, 0, 0}},
-		{"union{int16,int8}", []int64{0, 0}},
-		{"union{int8,int16}", []int64{0, 0}},
-		{"union{int8}", []int64{0}},
+		{"union{_ int16,_ int8,_ int8,_ int16}", []int64{0, 0, 0, 0}},
+		{"union{_ int16,_ int8,_ int8,_ int32}", []int64{0, 0, 0, 0}},
+		{"union{_ int16,_ int8,_ int8,_ int64}", []int64{0, 0, 0, 0}},
+		{"union{_ int16,_ int8,_ int8}", []int64{0, 0, 0}},
+		{"union{_ int16,_ int8}", []int64{0, 0}},
+		{"union{_ int8,_ int16}", []int64{0, 0}},
+		{"union{_ int8}", []int64{0}},
 		{"union{}", nil},
 	} {
 		typ, err := types.Type(TypeID(dict.SID(v.src)))
@@ -376,21 +379,21 @@ func TestLayoutSize(t *testing.T) {
 		src string
 		sz  []int64
 	}{
-		{"struct{int16,int8,int8,int16}", []int64{2, 1, 1, 2}},
-		{"struct{int16,int8,int8,int32}", []int64{2, 1, 1, 4}},
-		{"struct{int16,int8,int8,int64}", []int64{2, 1, 1, 8}},
-		{"struct{int16,int8,int8}", []int64{2, 1, 1}},
-		{"struct{int16,int8}", []int64{2, 1}},
-		{"struct{int8,int16}", []int64{1, 2}},
-		{"struct{int8}", []int64{1}},
+		{"struct{_ int16,_ int8,_ int8,_ int16}", []int64{2, 1, 1, 2}},
+		{"struct{_ int16,_ int8,_ int8,_ int32}", []int64{2, 1, 1, 4}},
+		{"struct{_ int16,_ int8,_ int8,_ int64}", []int64{2, 1, 1, 8}},
+		{"struct{_ int16,_ int8,_ int8}", []int64{2, 1, 1}},
+		{"struct{_ int16,_ int8}", []int64{2, 1}},
+		{"struct{_ int8,_ int16}", []int64{1, 2}},
+		{"struct{_ int8}", []int64{1}},
 		{"struct{}", nil},
-		{"union{int16,int8,int8,int16}", []int64{2, 1, 1, 2}},
-		{"union{int16,int8,int8,int32}", []int64{2, 1, 1, 4}},
-		{"union{int16,int8,int8,int64}", []int64{2, 1, 1, 8}},
-		{"union{int16,int8,int8}", []int64{2, 1, 1}},
-		{"union{int16,int8}", []int64{2, 1}},
-		{"union{int8,int16}", []int64{1, 2}},
-		{"union{int8}", []int64{1}},
+		{"union{_ int16,_ int8,_ int8,_ int16}", []int64{2, 1, 1, 2}},
+		{"union{_ int16,_ int8,_ int8,_ int32}", []int64{2, 1, 1, 4}},
+		{"union{_ int16,_ int8,_ int8,_ int64}", []int64{2, 1, 1, 8}},
+		{"union{_ int16,_ int8,_ int8}", []int64{2, 1, 1}},
+		{"union{_ int16,_ int8}", []int64{2, 1}},
+		{"union{_ int8,_ int16}", []int64{1, 2}},
+		{"union{_ int8}", []int64{1}},
 		{"union{}", nil},
 	} {
 		typ, err := types.Type(TypeID(dict.SID(v.src)))
@@ -416,21 +419,21 @@ func TestLayoutPadding(t *testing.T) {
 		src string
 		p   []int
 	}{
-		{"struct{int16,int8,int8,int16}", []int{0, 0, 0, 0}},
-		{"struct{int16,int8,int8,int32}", []int{0, 0, 0, 0}},
-		{"struct{int16,int8,int8,int64}", []int{0, 0, 4, 0}},
-		{"struct{int16,int8,int8}", []int{0, 0, 0}},
-		{"struct{int16,int8}", []int{0, 1}},
-		{"struct{int8,int16}", []int{1, 0}},
-		{"struct{int8}", []int{0}},
+		{"struct{_ int16,_ int8,_ int8,_ int16}", []int{0, 0, 0, 0}},
+		{"struct{_ int16,_ int8,_ int8,_ int32}", []int{0, 0, 0, 0}},
+		{"struct{_ int16,_ int8,_ int8,_ int64}", []int{0, 0, 4, 0}},
+		{"struct{_ int16,_ int8,_ int8}", []int{0, 0, 0}},
+		{"struct{_ int16,_ int8}", []int{0, 1}},
+		{"struct{_ int8,_ int16}", []int{1, 0}},
+		{"struct{_ int8}", []int{0}},
 		{"struct{}", nil},
-		{"union{int16,int8,int8,int16}", []int{0, 1, 1, 0}},
-		{"union{int16,int8,int8,int32}", []int{2, 3, 3, 0}},
-		{"union{int16,int8,int8,int64}", []int{6, 7, 7, 0}},
-		{"union{int16,int8,int8}", []int{0, 1, 1}},
-		{"union{int16,int8}", []int{0, 1}},
-		{"union{int8,int16}", []int{1, 0}},
-		{"union{int8}", []int{0}},
+		{"union{_ int16,_ int8,_ int8, int16}", []int{0, 1, 1, 0}},
+		{"union{_ int16,_ int8,_ int8, int32}", []int{2, 3, 3, 0}},
+		{"union{_ int16,_ int8,_ int8, int64}", []int{6, 7, 7, 0}},
+		{"union{_ int16,_ int8,_ int8}", []int{0, 1, 1}},
+		{"union{_ int16,_ int8}", []int{0, 1}},
+		{"union{_ int8,_ int16}", []int{1, 0}},
+		{"union{_ int8}", []int{0}},
 		{"union{}", nil},
 	} {
 		typ, err := types.Type(TypeID(dict.SID(v.src)))
@@ -474,15 +477,15 @@ func benchmarkParser(b *testing.B) {
 		[]byte("int32"),
 		[]byte("int64"),
 		[]byte("int8"),
-		[]byte("struct{int8,int16}"),
-		[]byte("struct{int8}"),
+		[]byte("struct{_ int8,_ int16}"),
+		[]byte("struct{_ int8}"),
 		[]byte("struct{}"),
 		[]byte("uint16"),
 		[]byte("uint32"),
 		[]byte("uint64"),
 		[]byte("uint8"),
-		[]byte("union{int8,int16}"),
-		[]byte("union{int8}"),
+		[]byte("union{_ int8,_ int16}"),
+		[]byte("union{_ int8}"),
 		[]byte("union{}"),
 	}
 	n := 0
@@ -523,15 +526,15 @@ func benchmarkTypeCache(b *testing.B) {
 		TypeID(dict.SID("int32")),
 		TypeID(dict.SID("int64")),
 		TypeID(dict.SID("int8")),
-		TypeID(dict.SID("struct{int8,int16}")),
-		TypeID(dict.SID("struct{int8}")),
+		TypeID(dict.SID("struct{_ int8,_ int16}")),
+		TypeID(dict.SID("struct{_ int8}")),
 		TypeID(dict.SID("struct{}")),
 		TypeID(dict.SID("uint16")),
 		TypeID(dict.SID("uint32")),
 		TypeID(dict.SID("uint64")),
 		TypeID(dict.SID("uint8")),
-		TypeID(dict.SID("union{int8,int16}")),
-		TypeID(dict.SID("union{int8}")),
+		TypeID(dict.SID("union{_ int8,_ int16}")),
+		TypeID(dict.SID("union{_ int8}")),
 		TypeID(dict.SID("union{}")),
 	}
 	n := 0

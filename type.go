@@ -28,16 +28,17 @@ var (
 //	ArrayType	= "[" "0"..."9" { "0"..."9" } "]" Type .
 //	FunctionType	= "func" "(" [ TypeList ] [ "..." ] ")" [ Type | "(" TypeList ")" ] .
 //	PointerType	= "*" Type .
-//	StructType	= "struct" "{" [ TypeList ] "}" .
+//	StructType	= "struct" "{" [ FieldList ] "}" .
+//	Fieldist	= name " " Type { "," name " " Type } .
 //	TypeList	= Type { "," Type } .
 //	TypeName	= "uint8" | "uint16" | "uint32" | "uint64"
 //			| "int8" | "int16" | "int32" | "int64"
 //			| "float32" | "float64" | "float128"
 //			| "complex64" | "complex128" | complex256
 //			| "uint0" | "uint8" | "uint16" | "uint32" | "uint64" .
-//	UnionType	= "union" "{" [ TypeList ] "}" .
+//	UnionType	= "union" "{" [ FieldList ] "}" .
 //
-// No whitespace is allowed in type specifiers.
+// No whitespace is allowed in type specifiers except as the name Type separator.
 //
 //  [0]: https://golang.org/ref/spec#Notation
 //
@@ -176,12 +177,6 @@ func (t *StructOrUnionType) Pointer() Type { return newPointerType(t) }
 // TypeCache maps TypeIDs to  Types. Use TypeCache{} to create a ready to use
 // TypeCache value.
 type TypeCache map[TypeID]Type
-
-// Fields set field names t, which must represent a struct or union type.
-func (c TypeCache) Fields(t TypeID, names []NameID) {
-	typ := c.MustType(t).(*StructOrUnionType)
-	typ.Names = names
-}
 
 func (c TypeCache) c(p *[]byte) tok {
 	s := *p
@@ -354,11 +349,6 @@ func (c TypeCache) lex(p *[]byte) tok {
 func (c TypeCache) parseTypeList(p *[]byte) ([]Type, error) {
 	var l []Type
 	for {
-		switch c.c(p) {
-		case '}':
-			return l, nil
-		}
-
 		t, err := c.parse(p, 0)
 		if err != nil {
 			return nil, err
@@ -373,6 +363,46 @@ func (c TypeCache) parseTypeList(p *[]byte) ([]Type, error) {
 			}
 		default:
 			return l, nil
+		}
+	}
+}
+
+func (c TypeCache) parseFieldList(p *[]byte) ([]NameID, []Type, error) {
+	var nl []NameID
+	var tl []Type
+	first := true
+	for {
+		p0 := *p
+	outer:
+		for {
+			switch x := c.c(p); x {
+			case ' ':
+				nl = append(nl, NameID(dict.ID(p0[:len(p0)-len(*p)])))
+				c.n(p)
+				break outer
+			case tokEOF:
+				return nil, nil, fmt.Errorf("expected ' '")
+			case '}':
+				if first {
+					return nl, tl, nil
+				}
+			}
+			c.n(p)
+			first = false
+
+		}
+
+		t, err := c.parse(p, 0)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		tl = append(tl, t)
+		switch c.c(p) {
+		case ',':
+			c.n(p)
+		case '}':
+			return nl, tl, nil
 		}
 	}
 }
@@ -533,7 +563,7 @@ func (c TypeCache) parse(p *[]byte, id TypeID) (Type, error) {
 			return nil, fmt.Errorf("expected '{'")
 		}
 
-		l, err := c.parseTypeList(p)
+		nl, tl, err := c.parseFieldList(p)
 		if err != nil {
 			return nil, err
 		}
@@ -542,7 +572,7 @@ func (c TypeCache) parse(p *[]byte, id TypeID) (Type, error) {
 			return nil, fmt.Errorf("expected '}'")
 		}
 
-		t := &StructOrUnionType{TypeBase: TypeBase{TypeKind: k}, Fields: l}
+		t := &StructOrUnionType{TypeBase: TypeBase{TypeKind: k}, Fields: tl, Names: nl}
 		return t.setID(id, p0, p, c, t), nil
 	}
 	return nil, fmt.Errorf("unexpected %q (%q)", tk, p0)
