@@ -128,7 +128,7 @@ func (l *linker) collectSymbols() {
 						l.intern[k] = i
 					}
 				default:
-					panic("ir.linker iinternal error")
+					panic("ir.linker internal error")
 				}
 			case *FunctionDefinition:
 				switch x.Linkage {
@@ -452,7 +452,7 @@ func (l *linker) define(e extern) int {
 func (l *linker) linkMain() {
 	start, ok := l.extern[NameID(idStart)]
 	if !ok {
-		panic(fmt.Errorf("ir.linker i_start undefined (forgotten crt0?)"))
+		panic(fmt.Errorf("ir.linker _start undefined (forgotten crt0?)"))
 	}
 	l.define(start)
 }
