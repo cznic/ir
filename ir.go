@@ -10,7 +10,7 @@
 // Concepts
 //
 // From the POV of this package, an IR is a slice of Objects. Object is either
-// a DataDefinition of a FunctionDefinition. All objects are defined by
+// a DataDefinition or a FunctionDefinition. All objects are defined by
 // Linkage, NameID and TypeID fields.
 //
 // DataDefintions reserve global, static data storage and have an optional
