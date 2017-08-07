@@ -6,6 +6,36 @@
 // (Work In Progress)
 //
 // See: https://en.wikipedia.org/wiki/Intermediate_representation
+//
+// Concepts
+//
+// From the POV of this package, an IR is a slice of Objects. Object is either
+// a DataDefinition of a FunctionDefinition. All objects are defined by
+// Linkage, NameID and TypeID fields.
+//
+// DataDefintions reserve global, static data storage and have an optional
+// Value. If Value is nil the DataDefintion defines a zero value of its type.
+//
+// FunctionDefinitions have a Body which is a slice of Operation. Operations
+// are, for example, Add, Return, etc. The operation execution model is a zero
+// register stack machine.
+//
+// Verifying and linking
+//
+// After generating a slice of Objects, its every item should be verified using
+// Verify. One or more generated IRs can be turned into complete IRs using
+// LinkMain or LinkLib. These functions will check and resolve external
+// definitions by filling the respective Index fields of certain operations,
+// for example Global. A properly linked IR should be suitable for back-end
+// code generation of a program or a library.
+//
+// Executing IR programs
+//
+// cznic/virtual is an IR code generator for a virtual CPU and can also run the
+// resulting binary. The virtual CPU is not very fast, it's best use is
+// probably just to verify a particular IR generator or to provide an
+// interpreter for scripts loaded/entered at run time. A "standard" back-end
+// should normally produce machine code,
 package ir
 
 import (
