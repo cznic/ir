@@ -37,7 +37,7 @@ func (c *counter) Write(b []byte) (int, error) {
 	return len(b), nil
 }
 
-// Objects represent []Object implementing with io.ReaderFrom and io.WriterTo.
+// Objects represent []Object implementing io.ReaderFrom and io.WriterTo.
 type Objects []Object
 
 // ReadFrom reads o from r.
