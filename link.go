@@ -5,11 +5,105 @@
 package ir
 
 import (
+	"bytes"
+	"compress/gzip"
+	"encoding/gob"
 	"fmt"
+	"io"
+	"runtime"
 	"sort"
+	"strconv"
+	"time"
 
 	"github.com/cznic/internal/buffer"
 )
+
+const (
+	binaryVersion = 1 // Compatibility version of Objects.
+)
+
+var (
+	_ io.ReaderFrom = (*Objects)(nil)
+	_ io.Writer     = (*counter)(nil)
+	_ io.WriterTo   = (Objects)(nil)
+
+	magic = []byte{0x64, 0xe0, 0xc8, 0x8e, 0xca, 0xeb, 0x80, 0x65}
+)
+
+type counter int64
+
+func (c *counter) Write(b []byte) (int, error) {
+	*c += counter(len(b))
+	return len(b), nil
+}
+
+// Objects represent []Object implementing with io.ReaderFrom and io.WriterTo.
+type Objects []Object
+
+// ReadFrom reads o from r.
+func (o *Objects) ReadFrom(r io.Reader) (n int64, err error) {
+	var c counter
+	*o = nil
+	r = io.TeeReader(r, &c)
+	gr, err := gzip.NewReader(r)
+	if err != nil {
+		return 0, err
+	}
+
+	if len(gr.Header.Extra) < len(magic) || !bytes.Equal(gr.Header.Extra[:len(magic)], magic) {
+		return int64(c), fmt.Errorf("unrecognized file format")
+	}
+
+	buf := gr.Header.Extra[len(magic):]
+	a := bytes.Split(buf, []byte{'|'})
+	if len(a) != 3 {
+		return int64(c), fmt.Errorf("corrupted file")
+	}
+
+	if s := string(a[0]); s != runtime.GOOS {
+		return int64(c), fmt.Errorf("invalid platform %q", s)
+	}
+
+	if s := string(a[1]); s != runtime.GOARCH {
+		return int64(c), fmt.Errorf("invalid architecture %q", s)
+	}
+
+	v, err := strconv.ParseUint(string(a[2]), 10, 64)
+	if err != nil {
+		return int64(c), err
+	}
+
+	if v != binaryVersion {
+		return int64(c), fmt.Errorf("invalid version number %v", v)
+	}
+
+	err = gob.NewDecoder(gr).Decode(o)
+	return int64(c), err
+}
+
+// WriteTo writes o to w.
+func (o Objects) WriteTo(w io.Writer) (n int64, err error) {
+	var c counter
+	gw := gzip.NewWriter(io.MultiWriter(w, &c))
+	gw.Header.Comment = "IR objects"
+	var buf buffer.Bytes
+	buf.Write(magic)
+	fmt.Fprintf(&buf, fmt.Sprintf("%s|%s|%v", runtime.GOOS, runtime.GOARCH, binaryVersion))
+	gw.Header.Extra = buf.Bytes()
+	buf.Close()
+	gw.Header.ModTime = time.Now()
+	gw.Header.OS = 255 // Unknown OS.
+	enc := gob.NewEncoder(gw)
+	if err := enc.Encode(o); err != nil {
+		return int64(c), err
+	}
+
+	if err := gw.Close(); err != nil {
+		return int64(c), err
+	}
+
+	return int64(c), nil
+}
 
 // LinkMain returns all objects transitively referenced from function _start or
 // an error, if any. Linking may mutate passed objects. It's the caller
