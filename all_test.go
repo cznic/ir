@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"encoding/gob"
 	"fmt"
+	"io/ioutil"
 	"math"
 	"os"
 	"path"
@@ -630,6 +631,64 @@ func TestGobStringID(t *testing.T) {
 	}
 }
 
-func TestGob(t *testing.T) {
-	t.Log("TODO")
+func TestObjectsGob(t *testing.T) {
+	out := Objects{
+		&FunctionDefinition{
+			Body: []Operation{
+				&Result{
+					Address: true,
+				},
+			},
+		},
+	}
+
+	f := bytes.NewBuffer(nil)
+	enc := gob.NewEncoder(f)
+	if err := enc.Encode(out); err != nil {
+		t.Fatal(err)
+	}
+
+	var in Objects
+	dec := gob.NewDecoder(f)
+	if err := dec.Decode(&in); err != nil {
+		t.Fatal(err)
+	}
+
+	if g, e := PrettyString(in), PrettyString(out); g != e {
+		t.Fatalf("got\n%s\nexp\n%s", g, e)
+	}
+}
+
+func TestObjects(t *testing.T) {
+	out := Objects{
+		&FunctionDefinition{
+			Body: []Operation{
+				&Result{
+					Address: true,
+				},
+			},
+		},
+	}
+
+	f, err := ioutil.TempFile("", "test-ir-")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := Objects(out).WriteTo(f); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := f.Seek(0, os.SEEK_SET); err != nil {
+		t.Fatal(err)
+	}
+
+	var in Objects
+	if _, err := in.ReadFrom(f); err != nil {
+		t.Fatal(err)
+	}
+
+	if g, e := PrettyString(in), PrettyString(out); g != e {
+		t.Fatalf("got\n%s\nexp\n%s", g, e)
+	}
 }
