@@ -106,9 +106,9 @@ type Object interface {
 type ObjectBase struct {
 	Comment NameID
 	Linkage
-	NameID
-	Package NameID
-	TypeID
+	NameID   NameID
+	Package  NameID
+	TypeID   TypeID
 	TypeName NameID
 	token.Position
 }

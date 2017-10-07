@@ -41,7 +41,7 @@ type AddressValue struct {
 	Index int
 	Label NameID
 	Linkage
-	NameID
+	NameID NameID
 	Offset uintptr
 	valuer
 }
@@ -145,8 +145,8 @@ func (v *Int64Value) String() string { return fmt.Sprint(v.Value) }
 
 // StringValue is a declaration initializer constant of type string.
 type StringValue struct {
-	Offset uintptr
-	StringID
+	Offset   uintptr
+	StringID StringID
 	valuer
 }
 

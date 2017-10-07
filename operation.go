@@ -82,7 +82,7 @@ type Operation interface {
 // Add operation adds the top stack item (b) and the previous one (a) and
 // replaces both operands with a + b.
 type Add struct {
-	TypeID // Operands type.
+	TypeID TypeID // Operands type.
 	token.Position
 }
 
@@ -104,7 +104,7 @@ func (o *Add) String() string {
 // AllocResult operation reserves evaluation stack space for a result of type
 // TypeID.
 type AllocResult struct {
-	TypeID
+	TypeID   TypeID
 	TypeName NameID
 	token.Position
 }
@@ -127,7 +127,7 @@ func (o *AllocResult) String() string {
 
 // And operation replaces TOS with the bitwise and of the top two stack items.
 type And struct {
-	TypeID // Operands type.
+	TypeID TypeID // Operands type.
 	token.Position
 }
 
@@ -150,7 +150,7 @@ func (o *And) String() string {
 type Argument struct {
 	Address bool
 	Index   int
-	TypeID
+	TypeID  TypeID
 	token.Position
 }
 
@@ -235,7 +235,7 @@ func (o *BeginScope) String() string {
 // Bool operation converts TOS to a bool (ie. an int32) such that the result
 // reflects if the operand was non zero.
 type Bool struct {
-	TypeID // Operand type.
+	TypeID TypeID // Operand type.
 	token.Position
 }
 
@@ -268,10 +268,10 @@ func (o *Bool) String() string {
 // contains the space reseved for function results, if any, and any function
 // arguments. On return all arguments are removed from the stack.
 type Call struct {
-	Arguments int  // Actual number of arguments passed to function.
-	Comma     bool // The call operation is produced by the C comma operator for a void function.
-	Index     int  // A negative value or an function object index as resolved by the linker.
-	TypeID         // Type of the function.
+	Arguments int    // Actual number of arguments passed to function.
+	Comma     bool   // The call operation is produced by the C comma operator for a void function.
+	Index     int    // A negative value or an function object index as resolved by the linker.
+	TypeID    TypeID // Type of the function.
 	token.Position
 }
 
@@ -340,9 +340,9 @@ func (o *Call) String() string {
 // pointer and any function arguments. On return all arguments and the function
 // pointer are removed from the stack.
 type CallFP struct {
-	Arguments int  // Actual number of arguments passed to function.
-	Comma     bool // The call FP operation is produced by the C comma operator for a void function.
-	TypeID         // Type of the function pointer.
+	Arguments int    // Actual number of arguments passed to function.
+	Comma     bool   // The call FP operation is produced by the C comma operator for a void function.
+	TypeID    TypeID // Type of the function pointer.
 	token.Position
 }
 
@@ -411,8 +411,8 @@ func (o *CallFP) String() string {
 
 // Const operation pushes a constant value on the evaluation stack.
 type Const struct {
-	TypeID
-	Value Value
+	TypeID TypeID
+	Value  Value
 	token.Position
 }
 
@@ -434,9 +434,9 @@ func (o *Const) String() string {
 
 // Const32 operation pushes a 32 bit value on the evaluation stack.
 type Const32 struct {
-	LOp bool // This operation is an artifact of || or &&.
-	TypeID
-	Value int32
+	LOp    bool // This operation is an artifact of || or &&.
+	TypeID TypeID
+	Value  int32
 	token.Position
 }
 
@@ -462,8 +462,8 @@ func (o *Const32) String() string {
 
 // Const64 operation pushes a 64 bit value on the evaluation stack.
 type Const64 struct {
-	TypeID
-	Value int64
+	TypeID TypeID
+	Value  int64
 	token.Position
 }
 
@@ -485,8 +485,8 @@ func (o *Const64) String() string {
 
 // ConstC128 operation pushes a complex128 value on the evaluation stack.
 type ConstC128 struct {
-	TypeID
-	Value complex128
+	TypeID TypeID
+	Value  complex128
 	token.Position
 }
 
@@ -509,7 +509,7 @@ func (o *ConstC128) String() string {
 // Convert operation converts TOS to the result type.
 type Convert struct {
 	Result TypeID // Conversion type.
-	TypeID        // Operand type.
+	TypeID TypeID // Operand type.
 	token.Position
 }
 
@@ -541,7 +541,7 @@ func (o *Convert) String() string {
 // Copy assigns source, which address is at TOS, to dest, which address is the
 // previous stack item. The source address is removed from the stack.
 type Copy struct {
-	TypeID // Operand type.
+	TypeID TypeID // Operand type.
 	token.Position
 }
 
@@ -578,7 +578,7 @@ func (o *Copy) String() string {
 
 // Cpl operation replaces TOS with ^TOS (bitwise complement).
 type Cpl struct {
-	TypeID // Operand type.
+	TypeID TypeID // Operand type.
 	token.Position
 }
 
@@ -601,7 +601,7 @@ func (o *Cpl) String() string {
 // replaces both operands with a / b. The operation panics if operands are
 // integers and b == 0.
 type Div struct {
-	TypeID // Operands type.
+	TypeID TypeID // Operands type.
 	token.Position
 }
 
@@ -622,9 +622,9 @@ func (o *Div) String() string {
 
 // Drop operation removes one item from the evaluation stack.
 type Drop struct {
-	Comma bool // The drop operation is produced by the C comma operator.
-	LOp   bool // This operation is an artifact of || or &&.
-	TypeID
+	Comma  bool // The drop operation is produced by the C comma operator.
+	LOp    bool // This operation is an artifact of || or &&.
+	TypeID TypeID
 	token.Position
 }
 
@@ -663,7 +663,7 @@ func (o *Drop) String() string {
 
 // Dup operation duplicates the top stack item.
 type Dup struct {
-	TypeID
+	TypeID TypeID
 	token.Position
 }
 
@@ -696,8 +696,8 @@ func (o *Dup) String() string {
 type Element struct {
 	Address   bool
 	IndexType TypeID
-	Neg       bool // Negate the index expression.
-	TypeID         // The indexed type.
+	Neg       bool   // Negate the index expression.
+	TypeID    TypeID // The indexed type.
 	token.Position
 }
 
@@ -785,7 +785,7 @@ func (o *EndScope) String() string {
 // replaces both operands with a non zero int32 value if a == b or zero
 // otherwise.
 type Eq struct {
-	TypeID // Operands type.
+	TypeID TypeID // Operands type.
 	token.Position
 }
 
@@ -809,7 +809,7 @@ func (o *Eq) String() string {
 type Field struct {
 	Address bool
 	Index   int
-	TypeID  // Pointer to a struct/union.
+	TypeID  TypeID // Pointer to a struct/union.
 	token.Position
 }
 
@@ -865,7 +865,7 @@ func (o *Field) String() string {
 // FieldValue replaces a struct/union at TOS with its field by index.
 type FieldValue struct {
 	Index  int
-	TypeID // Struct/union type.
+	TypeID TypeID // Struct/union type.
 	token.Position
 }
 
@@ -908,7 +908,7 @@ func (o *FieldValue) String() string {
 // replaces both operands with a non zero int32 value if a >= b or zero
 // otherwise.
 type Geq struct {
-	TypeID // Operands type.
+	TypeID TypeID // Operands type.
 	token.Position
 }
 
@@ -933,8 +933,8 @@ type Global struct {
 	Address bool
 	Index   int // A negative value or an object index as resolved by the linker.
 	Linkage
-	NameID
-	TypeID
+	NameID   NameID
+	TypeID   TypeID
 	TypeName NameID
 	token.Position
 }
@@ -973,7 +973,7 @@ func (o *Global) String() string {
 // replaces both operands with a non zero int32 value if a > b or zero
 // otherwise.
 type Gt struct {
-	TypeID // Operands type.
+	TypeID TypeID // Operands type.
 	token.Position
 }
 
@@ -994,8 +994,8 @@ func (o *Gt) String() string {
 
 // Jmp operation performs a branch to a named or numbered label.
 type Jmp struct {
-	Cond bool // This operation is an artifact of the conditional operator.
-	NameID
+	Cond   bool // This operation is an artifact of the conditional operator.
+	NameID NameID
 	Number int
 	token.Position
 }
@@ -1052,8 +1052,8 @@ func (o *JmpP) String() string {
 // the stack is non zero. The TOS type must be int32 and the operation removes
 // TOS.
 type Jnz struct {
-	LOp bool // This operation is an artifact of || or &&.
-	NameID
+	LOp    bool // This operation is an artifact of || or &&.
+	NameID NameID
 	Number int
 	token.Position
 }
@@ -1106,10 +1106,10 @@ func (o *Jz) String() string {
 // Label operation declares a named or numbered branch target. A valid Label
 // must have a non zero NameID or non negative Number.
 type Label struct {
-	Cond bool // This operation is an artifact of the conditional operator.
-	LAnd bool // This operation is an artifact of &&.
-	LOr  bool // This operation is an artifact of ||.
-	NameID
+	Cond   bool // This operation is an artifact of the conditional operator.
+	LAnd   bool // This operation is an artifact of &&.
+	LOr    bool // This operation is an artifact of ||.
+	NameID NameID
 	Nop    bool // This operation is an artifact of the conditional operator.
 	Number int
 	token.Position
@@ -1166,7 +1166,7 @@ func (o *Label) str() string {
 // replaces both operands with a non zero int32 value if a <= b or zero
 // otherwise.
 type Leq struct {
-	TypeID // Operands type.
+	TypeID TypeID // Operands type.
 	token.Position
 }
 
@@ -1187,7 +1187,7 @@ func (o *Leq) String() string {
 
 // Load replaces a pointer at TOS by its pointee.
 type Load struct {
-	TypeID // Pointer type.
+	TypeID TypeID // Pointer type.
 	token.Position
 }
 
@@ -1225,7 +1225,7 @@ func (o *Load) String() string {
 // previous one (a), which must be an integral type and replaces both operands
 // with a << b.
 type Lsh struct {
-	TypeID // Operand (a) type.
+	TypeID TypeID // Operand (a) type.
 	token.Position
 }
 
@@ -1278,7 +1278,7 @@ func (o *Lsh) String() string {
 // replaces both operands with a non zero int32 value if a < b or zero
 // otherwise.
 type Lt struct {
-	TypeID // Operands type.
+	TypeID TypeID // Operands type.
 	token.Position
 }
 
@@ -1300,7 +1300,7 @@ func (o *Lt) String() string {
 // Mul operation subtracts the top stack item (b) and the previous one (a) and
 // replaces both operands with a * b.
 type Mul struct {
-	TypeID // Operands type.
+	TypeID TypeID // Operands type.
 	token.Position
 }
 
@@ -1321,7 +1321,7 @@ func (o *Mul) String() string {
 
 // Neg operation replaces TOS with 0-TOS.
 type Neg struct {
-	TypeID // Operand type.
+	TypeID TypeID // Operand type.
 	token.Position
 }
 
@@ -1344,7 +1344,7 @@ func (o *Neg) String() string {
 // replaces both operands with a non zero int32 value if a != b or zero
 // otherwise.
 type Neq struct {
-	TypeID // Operands type.
+	TypeID TypeID // Operands type.
 	token.Position
 }
 
@@ -1365,7 +1365,7 @@ func (o *Neq) String() string {
 
 // Nil pushes a typed nil to TOS.
 type Nil struct {
-	TypeID // Pointer type.
+	TypeID TypeID // Pointer type.
 	token.Position
 }
 
@@ -1413,7 +1413,7 @@ func (o *Not) String() string {
 
 // Or operation replaces TOS with the bitwise or of the top two stack items.
 type Or struct {
-	TypeID // Operands type.
+	TypeID TypeID // Operands type.
 	token.Position
 }
 
@@ -1455,7 +1455,7 @@ type PostIncrement struct {
 	BitOffset    int
 	Bits         int
 	Delta        int
-	TypeID       // Operand type.
+	TypeID       TypeID // Operand type.
 	token.Position
 }
 
@@ -1512,7 +1512,7 @@ type PreIncrement struct {
 	BitOffset    int
 	Bits         int
 	Delta        int
-	TypeID       // Operand type.
+	TypeID       TypeID // Operand type.
 	token.Position
 }
 
@@ -1565,7 +1565,7 @@ func (o *PreIncrement) String() string {
 // and replaces both operands with a - b of type TypeID.
 type PtrDiff struct {
 	PtrType TypeID
-	TypeID  // Operands type.
+	TypeID  TypeID // Operands type.
 	token.Position
 }
 
@@ -1605,7 +1605,7 @@ func (o *PtrDiff) String() string {
 // Rem operation divides the top stack item (b) and the previous one (a) and
 // replaces both operands with a % b. The operation panics if b == 0.
 type Rem struct {
-	TypeID // Operands type.
+	TypeID TypeID // Operands type.
 	token.Position
 }
 
@@ -1629,7 +1629,7 @@ func (o *Rem) String() string {
 type Result struct {
 	Address bool
 	Index   int
-	TypeID
+	TypeID  TypeID
 	token.Position
 }
 
@@ -1687,7 +1687,7 @@ func (o *Return) String() string {
 // previous one (a), which must be an integral type and replaces both operands
 // with a >> b.
 type Rsh struct {
-	TypeID // Operand (a) type.
+	TypeID TypeID // Operand (a) type.
 	token.Position
 }
 
@@ -1742,7 +1742,7 @@ func (o *Rsh) String() string {
 type Store struct {
 	BitOffset int
 	Bits      int
-	TypeID    // Type of the value.
+	TypeID    TypeID // Type of the value.
 	token.Position
 }
 
@@ -1784,7 +1784,7 @@ func (o *Store) String() string {
 // StringConst operation pushes a string value on the evaluation stack.
 type StringConst struct {
 	Value  StringID
-	TypeID // Type of the pointer to the string value.
+	TypeID TypeID // Type of the pointer to the string value.
 	token.Position
 }
 
@@ -1807,7 +1807,7 @@ func (o *StringConst) String() string {
 // Sub operation subtracts the top stack item (b) and the previous one (a) and
 // replaces both operands with a - b.
 type Sub struct {
-	TypeID // Operands type.
+	TypeID TypeID // Operands type.
 	token.Position
 }
 
@@ -1831,7 +1831,7 @@ func (o *Sub) String() string {
 type Switch struct {
 	Default Label
 	Labels  []Label
-	TypeID  // Operand type.
+	TypeID  TypeID // Operand type.
 	Values  []Value
 	token.Position
 }
@@ -1913,7 +1913,7 @@ func (o *Switch) String() string {
 type Variable struct {
 	Address bool
 	Index   int
-	TypeID
+	TypeID  TypeID
 	token.Position
 }
 
@@ -1948,9 +1948,9 @@ func (o *Variable) String() string {
 // VariableDeclaration operation declares a function local variable. NameID,
 // TypeName and Value are all optional.
 type VariableDeclaration struct {
-	Index int // 0-based index within a function.
-	NameID
-	TypeID
+	Index    int // 0-based index within a function.
+	NameID   NameID
+	TypeID   TypeID
 	TypeName NameID
 	Value
 	token.Position
@@ -1980,7 +1980,7 @@ func (o *VariableDeclaration) String() string {
 
 // Xor operation replaces TOS with the bitwise xor of the top two stack items.
 type Xor struct {
-	TypeID // Operands type.
+	TypeID TypeID // Operands type.
 	token.Position
 }
 
