@@ -1079,8 +1079,8 @@ func (o *Jnz) String() string {
 // Jz operation performs a branch to a named or numbered label if the top of
 // the stack is zero. The TOS type must be int32 and the operation removes TOS.
 type Jz struct {
-	LOp bool // This operation is an artifact of || or && or the conditional operator.
-	NameID
+	LOp    bool // This operation is an artifact of || or && or the conditional operator.
+	NameID NameID
 	Number int
 	token.Position
 }
