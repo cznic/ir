@@ -100,6 +100,8 @@ var (
 	idInt32         = TypeID(dict.SID("int32"))
 	idInt64         = TypeID(dict.SID("int64"))
 	idInt8          = TypeID(dict.SID("int8"))
+	idMain          = NameID(dict.SID("main"))
+	idPint32        = TypeID(dict.SID("*int32"))
 	idStart         = dict.SID("_start")
 	idUint32        = TypeID(dict.SID("uint32"))
 	idUint64        = TypeID(dict.SID("uint64"))

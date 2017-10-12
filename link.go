@@ -28,6 +28,21 @@ var (
 	_ io.WriterTo   = (Objects)(nil)
 
 	magic = []byte{0x64, 0xe0, 0xc8, 0x8e, 0xca, 0xeb, 0x80, 0x65}
+
+	main = Objects{
+		&FunctionDefinition{
+			ObjectBase: ObjectBase{Linkage: ExternalLinkage, NameID: idMain},
+			Body: []Operation{
+				&Result{Address: true, TypeID: idPint32},
+				&Const32{TypeID: idInt32},
+				&Store{TypeID: idInt32},
+				&Drop{TypeID: idInt32},
+				&BeginScope{},
+				&Return{},
+				&EndScope{},
+			},
+		},
+	}
 )
 
 type counter int64
@@ -151,6 +166,22 @@ func LinkLib(translationUnits ...[]Object) (_ []Object, err error) {
 				err = fmt.Errorf("ir.LinkLib PANIC %v", x)
 			}
 		}()
+	}
+	ok := false
+search:
+	for _, v := range translationUnits {
+		for _, v := range v {
+			switch x := v.(type) {
+			case *FunctionDefinition:
+				if x.NameID == idMain {
+					ok = true
+					break search
+				}
+			}
+		}
+	}
+	if !ok {
+		translationUnits = append(translationUnits, main)
 	}
 	l := newLinker(translationUnits)
 	l.link()
