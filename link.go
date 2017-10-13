@@ -31,7 +31,7 @@ var (
 
 	main = Objects{
 		&FunctionDefinition{
-			ObjectBase: ObjectBase{Linkage: ExternalLinkage, NameID: idMain},
+			ObjectBase: ObjectBase{Linkage: ExternalLinkage, NameID: idMain, TypeID: idMainType},
 			Body: []Operation{
 				&Result{Address: true, TypeID: idPint32},
 				&Const32{TypeID: idInt32},
