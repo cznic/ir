@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"runtime"
+	"runtime/debug"
 	"sort"
 	"strconv"
 	"time"
@@ -232,14 +233,14 @@ func (l *linker) collectSymbols() {
 						switch def := l.in[ex.unit][ex.index].(type) {
 						case *DataDefinition:
 							if x.TypeID != def.TypeID {
-								panic("ir.linker internal error")
+								panic(fmt.Errorf("ir.linker internal error\n%s", debug.Stack()))
 							}
 
 							if x.Value != nil && def.Value == nil {
 								def.Value = x.Value
 							}
 						default:
-							panic(fmt.Errorf("ir.linker internal error %T", def))
+							panic(fmt.Errorf("ir.linker internal error %T\n%s", def, debug.Stack()))
 						}
 					default:
 						l.extern[x.NameID] = extern{unit: unit, index: i}
@@ -248,12 +249,12 @@ func (l *linker) collectSymbols() {
 					k := intern{x.NameID, unit}
 					switch _, ok := l.intern[k]; {
 					case ok:
-						panic(fmt.Errorf("ir.linker TODO: %T(%v)", x, x))
+						panic(fmt.Errorf("ir.linker TODO: %T(%v)\n%s", x, x, debug.Stack()))
 					default:
 						l.intern[k] = i
 					}
 				default:
-					panic("ir.linker internal error")
+					panic(fmt.Errorf("ir.linker internal error\n%s", debug.Stack()))
 				}
 			case *FunctionDefinition:
 				switch x.Linkage {
@@ -263,7 +264,7 @@ func (l *linker) collectSymbols() {
 						switch def := l.in[ex.unit][ex.index].(type) {
 						case *FunctionDefinition:
 							if x.TypeID != def.TypeID {
-								panic("internal error")
+								panic(fmt.Errorf("internal error\n%s", debug.Stack()))
 							}
 
 							if len(def.Body) != 1 {
@@ -275,9 +276,9 @@ func (l *linker) collectSymbols() {
 								break
 							}
 
-							panic(fmt.Errorf("%s: ir.linker internal error %s", x.Position, x.NameID))
+							panic(fmt.Errorf("%s: ir.linker internal error %s\n%s", x.Position, x.NameID, debug.Stack()))
 						default:
-							panic(fmt.Errorf("ir.linker internal error %T", def))
+							panic(fmt.Errorf("ir.linker internal error %T\n%s", def, debug.Stack()))
 						}
 					default:
 						l.extern[x.NameID] = extern{unit: unit, index: i}
@@ -286,15 +287,15 @@ func (l *linker) collectSymbols() {
 					k := intern{x.NameID, unit}
 					switch _, ok := l.intern[k]; {
 					case ok:
-						panic(fmt.Errorf("TODO: %T(%v)", x, x))
+						panic(fmt.Errorf("TODO: %T(%v)\n%s", x, x, debug.Stack()))
 					default:
 						l.intern[k] = i
 					}
 				default:
-					panic("ir.linker internal error")
+					panic(fmt.Errorf("ir.linker internal error\n%s", debug.Stack()))
 				}
 			default:
-				panic(fmt.Errorf("ir.linker internal error: %T(%v)", x, x))
+				panic(fmt.Errorf("ir.linker internal error: %T(%v)\n%s", x, x, debug.Stack()))
 			}
 		}
 	}
@@ -322,14 +323,14 @@ func (l *linker) initializer(op *VariableDeclaration, v Value) {
 
 			x.Index = l.define(e)
 		default:
-			panic(fmt.Errorf("ir.linker internal error %s", x.Linkage))
+			panic(fmt.Errorf("ir.linker internal error %s\n%s", x.Linkage, debug.Stack()))
 		}
 	case *CompositeValue:
 		for _, v := range x.Values {
 			l.initializer(op, v)
 		}
 	default:
-		panic(fmt.Errorf("ir.linker internal error: %T %v", x, op))
+		panic(fmt.Errorf("ir.linker internal error: %T %v\n%s", x, op, debug.Stack()))
 	}
 }
 
@@ -356,7 +357,7 @@ func (l *linker) checkCalls(p *[]Operation) {
 			x.FunctionPointer = true
 			static = append(static, -1)
 		case *Call:
-			panic("TODO")
+			panic(fmt.Errorf("TODO\n%s", debug.Stack()))
 		case *CallFP:
 			n := len(static)
 			index := static[n-1]
@@ -447,20 +448,20 @@ func (l *linker) defineFunc(e extern, f *FunctionDefinition) (r int) {
 					case ok:
 						v.Index = l.define(ex)
 					default:
-						panic("ir.linker TODO")
+						panic(fmt.Errorf("ir.linker TODO\n%s", debug.Stack()))
 					}
 				case InternalLinkage:
 					switch ex, ok := l.intern[intern{v.NameID, e.unit}]; {
 					case ok:
 						v.Index = l.define(extern{unit: e.unit, index: ex})
 					default:
-						panic("ir.linker TODO")
+						panic(fmt.Errorf("ir.linker TODO\n%s", debug.Stack()))
 					}
 				default:
-					panic("internal error")
+					panic(fmt.Errorf("internal error\n%s", debug.Stack()))
 				}
 			default:
-				panic(fmt.Errorf("%s: ir.linker %T", x.Position, v))
+				panic(fmt.Errorf("%s: ir.linker %T\n%s", x.Position, v, debug.Stack()))
 			}
 		case *Global:
 			switch x.Linkage {
@@ -489,12 +490,12 @@ func (l *linker) defineFunc(e extern, f *FunctionDefinition) (r int) {
 					panic(fmt.Errorf("%v: ir.linker undefined global %v", x.Position, x.NameID))
 				}
 			default:
-				panic("internal error")
+				panic(fmt.Errorf("internal error\n%s", debug.Stack()))
 			}
 		case *VariableDeclaration:
 			l.initializer(x, x.Value)
 		default:
-			panic(fmt.Errorf("ir.linker internal error: %T %s %#05x %v", x, f.NameID, ip, x))
+			panic(fmt.Errorf("ir.linker internal error: %T %s %#05x %v\n%s", x, f.NameID, ip, x, debug.Stack()))
 		}
 	}
 	l.checkCalls(&f.Body)
@@ -535,7 +536,7 @@ func (l *linker) defineData(e extern, d *DataDefinition) (r int) {
 					}
 				}
 			default:
-				panic("internal error")
+				panic(fmt.Errorf("internal error\n%s", debug.Stack()))
 			}
 		case *CompositeValue:
 			for _, v := range x.Values {
@@ -552,7 +553,7 @@ func (l *linker) defineData(e extern, d *DataDefinition) (r int) {
 			*WideStringValue:
 			// ok, nop.
 		default:
-			panic(fmt.Errorf("%v.%v: ir.linker internal error: %T", e.unit, e.index, x))
+			panic(fmt.Errorf("%v.%v: ir.linker internal error: %T\n%s", e.unit, e.index, x, debug.Stack()))
 		}
 	}
 	f(d.Value)
@@ -570,7 +571,7 @@ func (l *linker) define(e extern) int {
 	case *FunctionDefinition:
 		return l.defineFunc(e, x)
 	default:
-		panic(fmt.Errorf("ir.linker internal error: %T(%v)", x, x))
+		panic(fmt.Errorf("ir.linker internal error: %T(%v)\n%s", x, x, debug.Stack()))
 	}
 }
 
