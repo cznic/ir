@@ -633,10 +633,12 @@ func TestGobStringID(t *testing.T) {
 
 func TestObjectsGob(t *testing.T) {
 	out := Objects{
-		&FunctionDefinition{
-			Body: []Operation{
-				&Result{
-					Address: true,
+		[]Object{
+			&FunctionDefinition{
+				Body: []Operation{
+					&Result{
+						Address: true,
+					},
 				},
 			},
 		},
@@ -661,10 +663,12 @@ func TestObjectsGob(t *testing.T) {
 
 func TestObjects(t *testing.T) {
 	out := Objects{
-		&FunctionDefinition{
-			Body: []Operation{
-				&Result{
-					Address: true,
+		[]Object{
+			&FunctionDefinition{
+				Body: []Operation{
+					&Result{
+						Address: true,
+					},
 				},
 			},
 		},

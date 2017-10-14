@@ -20,7 +20,7 @@ import (
 )
 
 const (
-	binaryVersion = 1 // Compatibility version of Objects.
+	binaryVersion = 2 // Compatibility version of Objects.
 )
 
 var (
@@ -30,7 +30,7 @@ var (
 
 	magic = []byte{0x64, 0xe0, 0xc8, 0x8e, 0xca, 0xeb, 0x80, 0x65}
 
-	main = Objects{
+	main = []Object{
 		&FunctionDefinition{
 			ObjectBase: ObjectBase{Linkage: ExternalLinkage, NameID: idMain, TypeID: idMainType},
 			Body: []Operation{
@@ -54,7 +54,7 @@ func (c *counter) Write(b []byte) (int, error) {
 }
 
 // Objects represent []Object implementing io.ReaderFrom and io.WriterTo.
-type Objects []Object
+type Objects [][]Object
 
 // ReadFrom reads o from r.
 func (o *Objects) ReadFrom(r io.Reader) (n int64, err error) {
