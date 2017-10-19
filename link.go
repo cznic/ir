@@ -264,7 +264,22 @@ func (l *linker) collectSymbols() {
 						switch def := l.in[ex.unit][ex.index].(type) {
 						case *FunctionDefinition:
 							if x.TypeID != def.TypeID {
-								panic(fmt.Errorf("internal error\n%s", debug.Stack()))
+								// accept new def is f()T, while existing def if f(X,Y,Z...)T
+								xt := l.typeCache.MustType(x.TypeID).(*FunctionType)
+								dt := l.typeCache.MustType(def.TypeID).(*FunctionType)
+								if len(xt.Results) != len(dt.Results) {
+									panic(fmt.Errorf("incompatible external redefinition of %s\n\t%s: %v\n\t%s: %v", x.NameID, x.Position, xt, def.Position, dt))
+								}
+
+								for i, xr := range xt.Results {
+									if dr := dt.Results[i]; xr.ID() != dr.ID() {
+										panic(fmt.Errorf("incompatible external redefinition of %s\n\t%s: %v\n\t%s: %v", x.NameID, x.Position, xt, def.Position, dt))
+									}
+								}
+
+								if g, e := len(xt.Arguments), len(dt.Arguments); g != e && g != 0 && e != 0 {
+									panic(fmt.Errorf("incompatible external redefinition of %s\n\t%s: %v\n\t%s: %v", x.NameID, x.Position, xt, def.Position, dt))
+								}
 							}
 
 							if len(def.Body) != 1 {
