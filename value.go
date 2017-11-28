@@ -63,7 +63,12 @@ func (v *AddressValue) String() string {
 			return fmt.Sprintf("(extern %v, &%v+%v)", v.Index, v.NameID, v.Offset)
 		}
 	default:
-		panic("internal error")
+		switch {
+		case v.Label != 0:
+			return fmt.Sprintf("(%v, %v, &&%v+%v)", v.Index, v.NameID, v.Label, v.Offset)
+		default:
+			return fmt.Sprintf("(none %v, &%v+%v)", v.Index, v.NameID, v.Offset)
+		}
 	}
 }
 
