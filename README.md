@@ -1,8 +1,5 @@
-# ir
-Package ir implements intermediate representation of compiled programs. (Work In Progress)
+`github.com/cznic/ir` has moved to [`modernc.org/ir`](https://godoc.org/modernc.org/ir) ([vcs](https://gitlab.com/cznic/ir)).
 
-Installation
+Please update your import paths to `modernc.org/ir`.
 
-    $ go get github.com/cznic/ir
-
-Documentation: [godoc.org/github.com/cznic/ir](http://godoc.org/github.com/cznic/ir)
+This repo is now archived.
